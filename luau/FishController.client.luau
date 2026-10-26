@@ -73,6 +73,7 @@ local LEAP_DISTANCE = tune("LEAP_DISTANCE", 30)
 local LEAP_HEIGHT = tune("LEAP_HEIGHT", 10)
 local LEAP_TIME = tune("LEAP_TIME", 1.1)
 local LEAP_COOLDOWN = tune("LEAP_COOLDOWN", 1.2)
+local LEAP_SURFACE_UP = tune("LEAP_SURFACE_UP", 0.85) -- leaps only where the surface faces up this much (ball map: the top cap)
 local LEAP_ENTRY_KEEP = tune("LEAP_ENTRY_KEEP", 0.6) -- share of the arc's speed kept when diving back in
 local LEAP_CAMERA_FOLLOW = tune("LEAP_CAMERA_FOLLOW", 6) -- 1/s
 local LEAP_CAMERA_PITCH = tune("LEAP_CAMERA_PITCH", -0.22) -- rad
@@ -736,7 +737,24 @@ local function startLeap(clock: number, aim: Vector3, normal: Vector3, factor: n
 		flat = Vector3.xAxis
 	end
 	local rootPart = root :: BasePart
-	leap = { t0 = clock, origin = rootPart.Position, dir = flat.Unit, up = normal, distance = LEAP_DISTANCE * factor }
+	local dir = flat.Unit
+	local distance = LEAP_DISTANCE * factor
+	if FishGame:GetAttribute("MapWaterShape") == "Sphere" then
+		-- never leap off the ball: the landing point stays within 90 % of its outline, even at high speed
+		local centre = FishGame:GetAttribute("MapWaterCenter") or Vector3.zero
+		local radius = FishGame:GetAttribute("MapWaterRadius") or 110
+		local from = (rootPart.Position - centre) * Vector3.new(1, 0, 1)
+		local along = Vector3.new(dir.X, 0, dir.Z)
+		if along.Magnitude > 1e-3 then
+			along = along.Unit
+			local b = from:Dot(along)
+			local disc = b * b - (from:Dot(from) - (0.9 * radius) ^ 2)
+			if disc > 0 then
+				distance = math.clamp(-b + math.sqrt(disc), 0, distance)
+			end
+		end
+	end
+	leap = { t0 = clock, origin = rootPart.Position, dir = dir, up = normal, distance = distance }
 	lastLeap = clock
 	Remotes.Splash:FireServer(surfacePoint(rootPart.Position))
 end
@@ -756,11 +774,12 @@ end
 -- Returns false once the fish is back in the water (the swim step takes over this frame).
 local function stepLeap(dt: number, clock: number): boolean
 	local f = (clock - leap.t0) / LEAP_TIME
-	if f >= 1 then
+	local rootPart = root :: BasePart
+	-- back under the surface after the top of the arc (a curved surface can come up to meet the fish): dive in
+	if f >= 1 or (f > 0.55 and surfaceAt(rootPart.Position) > 0.6) then
 		endLeap(clock)
 		return false
 	end
-	local rootPart = root :: BasePart
 	local arc = leap.dir * (leap.distance / LEAP_TIME) + leap.up * (4 * LEAP_HEIGHT * (1 - 2 * f) / LEAP_TIME)
 	local onArc = leap.origin + leap.dir * (leap.distance * f) + leap.up * (4 * LEAP_HEIGHT * f * (1 - f))
 	-- stay on the arc even when something nudges the fish
@@ -864,7 +883,7 @@ local function stepSwim(dt: number, clock: number, intent, depth: number, normal
 		local speedNow = vel.Magnitude
 		local aim = if speedNow > 0.1 then vel / speedNow else travel
 		local outward = vel:Dot(normal)
-		if normal.Y > 0.5 and aim:Dot(normal) > LEAP_MIN_PITCH and outward > LEAP_MIN_SPEED * 0.5
+		if normal.Y > LEAP_SURFACE_UP and aim:Dot(normal) > LEAP_MIN_PITCH and outward > LEAP_MIN_SPEED * 0.5
 			and speedNow > LEAP_MIN_SPEED and clock - lastLeap > LEAP_COOLDOWN and control >= 1 then
 			startLeap(clock, aim, normal, factor)
 			if stepLeap(dt, clock) then

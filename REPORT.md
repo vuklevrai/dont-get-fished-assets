@@ -23,8 +23,9 @@ Branche `cloud-assets`. Les six tâches du brief (C1 à C6) sont livrées. **Rie
 | `speed_line.png` (256×32), `speed_lines_screen.png` et `_b.png` (1024²) | **C4.3**, lignes de vitesse du dash |
 | `low_hp_vignette.png` (1024²) | **C4.4**, vignette rouge de quasi-mort |
 | `zone_wall_flipbook.png` (4×4, se répète à l'horizontale), `zone_wall_static.png` (512²) | **C3**, mur de zone style tempête Fortnite |
-| `*_preview_water.png`, `*_preview_sky.png`, `zone_wall_tiling_check.png` | Aperçus sur l'eau (78, 214, 251) et sur le ciel |
+| `*_preview_water.png`, `*_preview_sky.png`, `*_water.gif`, `*_sky.gif`, `zone_wall_tiling_check.png` | Aperçus (planches et GIF animés) sur l'eau (78, 214, 251) et sur le ciel |
 | `fog_flipbook.py`, `titan_lightning.py`, `screen_fx.py`, `zone_wall.py`, `fxlib.py` | Générateurs Blender déterministes |
+| `make_gifs.py` | Les GIF d'aperçu (Python et Pillow, sans Blender) |
 
 ### Cartes et modèles (`maps/`, `models/`) — détails dans `maps/README.md`
 | Fichier | Rôle |
@@ -47,16 +48,16 @@ Branche `cloud-assets`. Les six tâches du brief (C1 à C6) sont livrées. **Rie
 
 | Carte / modèle | Dimensions réelles | Primitives | Points d'ancrage |
 |---|---|---|---|
-| **Aquarium** | eau de 324 × 252, surface à y = −1, sable vers −86 (environ 85 à 90 de profondeur), verre de 2 d'épaisseur jusqu'à y = +8, rebord jusqu'à +11, meuble dessous | **1 410** / 4 000 | 10 `FishermanSpots` (sol des pods à y = 11, regard vers le centre), 22 `SeaweedSpots`, `PlayerSpawnVolume` (300 × 60 × 228), axes des 4 tunnels du rocher, château, arche |
+| **Aquarium** | eau de 324 × 252, surface à y = −1, sable vers −86 (environ 85 à 90 de profondeur), verre de 2 d'épaisseur jusqu'à y = +8, rebord jusqu'à +11, meuble dessous | **1 419** / 4 000 | 10 `FishermanSpots` (sol des pods à y = 11, regard vers le centre), 22 `SeaweedSpots`, `PlayerSpawnVolume` (300 × 60 × 228), 24 `PlayerSpawnPoints` vérifiés, axes des 4 tunnels du rocher, château, arche |
 | └ gros rocher | environ 91 × 45 × 70, creux, avec 4 passages de 13 à 14 studs (environ 11 libres) | 823 avec les petits rochers | — |
 | └ mini château | 46 × 32 × 46, portes de 14 × 17, fenêtres de 10 × 10, 4 tours | 116 | — |
 | **FuturisticPod** | disque de 16 + rampe de 6, hauteur environ 13 avec l'arche | **78** / 300 | origine = sol du pod, regard vers −Z |
-| **Ballon** | sphère de rayon 110 en (0, 0, 0) (eau faite en local), 10 pods de y ≈ −6 à y ≈ 60 | **190** (plateformes) | 10 `FishermanSpots`, bout de rampe à exactement 8 de la bulle, `PlayerSpawnVolume` (cube de 111), `PlayerSpawnSphere` (r = 88), attributs à poser |
-| **Océan** | boîte de 1 200 × 1 200, arène de 300 × 240, mur de y = −60 à +40 | **4** (mur de zone) | 10 `BoatSpots` (proue vers le centre, au moins 3 studs hors du mur), 10 `FishermanSpots` en coordonnées monde, `IslandSpot` (200, −1, −470), `PlayerSpawnVolume` |
+| **Ballon** | sphère de rayon 110 en (0, 0, 0) (eau faite en local), 10 pods de y ≈ −6 à y ≈ 60 | **190** (plateformes) | 10 `FishermanSpots`, bout de rampe à exactement 8 de la bulle, `PlayerSpawnVolume` (cube de 111), `PlayerSpawnSphere` (r = 88), 24 `PlayerSpawnPoints`, attributs à poser |
+| **Océan** | boîte de 1 200 × 1 200, arène de 300 × 240, mur de y = −60 à +40 | **4** (mur de zone) | 10 `BoatSpots` (proue vers le centre, au moins 3 studs hors du mur), 10 `FishermanSpots` en coordonnées monde, `IslandSpot` (200, −1, −470), `PlayerSpawnVolume`, 24 `PlayerSpawnPoints` |
 | **FishingBoat** | 26 × 10, hauteur environ 14 avec le mât | **232** / 600 | `FishermanStand` en (0 ; 4,6 ; 10,6), regard vers la proue |
 | **Island** | environ 34 de large, palmier d'environ 20 de haut | **96** | origine sur la ligne d'eau |
 
-Tous les matériaux sont dans la liste autorisée. Toutes les rotations ont été vérifiées : orthonormées, déterminant +1. Chaque image de données est relue pour vérifier qu'elle redonne exactement son JSON.
+Tous les matériaux sont dans la liste autorisée. Toutes les rotations ont été vérifiées : orthonormées, déterminant +1. Chaque image de données est relue pour vérifier qu'elle redonne exactement son JSON : par Blender au moment de l'export, puis une seconde fois par Pillow, octet par octet. Les aperçus de chaque carte sont dans son dossier `previews/`, nommés `*_preview.png`.
 
 ## 3. Réglages clés
 

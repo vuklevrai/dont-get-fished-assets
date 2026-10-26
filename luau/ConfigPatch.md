@@ -61,6 +61,7 @@
 	LEAP_CAMERA_PITCH = -0.22, -- rad
 	LEAP_CAMERA_TILT = 0.3, -- rad of extra pitch along the arc's slope
 	LEAP_CONTROL_RETURN = 0.35, -- s for the mouse to take over again
+	LEAP_SURFACE_UP = 0.85, -- leaps only where the surface faces up this much (ball map: the top cap)
 
 	-- stun: knockback + ragdoll
 	STUN_DRAG = 0.92, -- 1/s: about 60 % of the speed lost per second
@@ -91,6 +92,24 @@
 | `MapWaterCenter`, `MapWaterRadius` | `FishGame` | `Vector3`, nombre | Carte Ballon : `(0, 0, 0)` et `110`. |
 
 Le contrôleur vérifie aussi qu'il y a vraiment de l'**eau de terrain** sous le poisson (`WATER_VOXEL_CHECK`). Si une carte utilisait de l'eau en parts, mettre `WATER_VOXEL_CHECK = false`.
+
+### Bouton du panneau admin (suggestion)
+
+À coller dans `AdminUi`, juste après le bouton « S = swim back ». Il utilise les fonctions du script existant (`act`, `meGrid`, `refreshers`). L'attribut n'est lu que par le client, donc un `SetAttribute` local suffit.
+
+```lua
+local MOVE_MODES = { "Classic", "CameraOnly", "ShiftLock" }
+local moveButton = act(meGrid, "", Color3.fromRGB(60, 150, 200), function() end)
+local function paintMoveMode()
+	moveButton.Text = "Move: " .. (player:GetAttribute("MoveMode") or "Classic")
+end
+moveButton.Activated:Connect(function()
+	local current = table.find(MOVE_MODES, player:GetAttribute("MoveMode") or "Classic") or 1
+	player:SetAttribute("MoveMode", MOVE_MODES[current % #MOVE_MODES + 1])
+	paintMoveMode()
+end)
+table.insert(refreshers, paintMoveMode)
+```
 
 ## 5. Ce que le client expose
 

@@ -53,7 +53,8 @@ On peut changer de mode en pleine nage, sans à-coup : le décalage d'épaule es
 
 ## 5. Bond hors de l'eau
 
-- Il se déclenche comme avant : nager vers le haut dans la surface, assez vite. Seulement sur le **dessus** de l'eau : sur la carte Ballon, uniquement sur la calotte supérieure de la sphère.
+- Il se déclenche comme avant : nager vers le haut dans la surface, assez vite. Seulement sur le **dessus** de l'eau : sur la carte Ballon, uniquement sur la calotte supérieure de la sphère, là où la normale de la surface pointe vers le haut à plus de 0,85 (`LEAP_SURFACE_UP`). Sur cette calotte, un bond de 30 studs retombe toujours sur la bulle : on ne peut pas s'éjecter soi-même en sautant.
+- Si la surface remonte à la rencontre du poisson après le sommet de l'arc (surface courbe), il replonge tout de suite au lieu de finir l'arc sous l'eau.
 - Arc prédéfini : 10 de haut, 30 de long, 1,1 s. Le poisson est **recalé sur l'arc** à chaque image, donc une petite poussée ne le dévie pas.
 - **Pendant le bond, la souris est ignorée** : la caméra suit seule la trajectoire, en lacet comme en tangage (`LEAP_CAMERA_*`). Au retour dans l'eau, la souris reprend la main progressivement en 0,35 s (`LEAP_CONTROL_RETURN`) pendant que le suivi automatique s'efface.
 - Si l'arc touche un obstacle (bateau, pod, rebord), le poisson rebondit, tourne sur lui-même 0,5 s et retombe.
