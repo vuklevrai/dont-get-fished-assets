@@ -342,7 +342,12 @@ def camera(name, eye, target, lens=30, ortho=None, clip_start=0.5, clip_end=5000
     return cam
 
 
+ONLY_VIEWS = set(filter(None, os.environ.get("ONLY_VIEWS", "").split(",")))   # e.g. aquarium_top_preview
+
+
 def render(path, cam):
+    if ONLY_VIEWS and os.path.splitext(os.path.basename(path))[0] not in ONLY_VIEWS:
+        return
     scene = bpy.context.scene
     scene.camera = cam
     scene.render.filepath = path
@@ -431,7 +436,7 @@ def do_aquarium(out_dir):
         build_meshes(weed.prims, "Weed")
         place_model(pod, spots["FishermanSpots"], "Pod")
         water_box((-M.HALF_X, M.FLOOR_Y, -M.HALF_Z), (M.HALF_X, M.WATER_LEVEL, M.HALF_Z))
-        render(os.path.join(prev, "aquarium_top_preview.png"), camera("top", (0, 600, 0.01), (0, 0, 0), ortho=480))
+        render(os.path.join(prev, "aquarium_top_preview.png"), camera("top", (0, 600, 0.01), (0, 0, 0), ortho=560))
         render(os.path.join(prev, "aquarium_overview_preview.png"), camera("ov", (330, 210, -380), (0, -45, 0), 30))
         # 2) side view cut through the middle: everything entirely in front of the rock's centre is left out
         cz = M.ROCK_CENTRE[2]
