@@ -7,7 +7,7 @@ Branche `cloud-assets`. Les six tâches du brief (C1 à C6) sont livrées. **Rie
 ### Code Luau (`luau/`)
 | Fichier | Rôle |
 |---|---|
-| `FishController.client.luau` | **C5**, remplacement complet du contrôleur de nage : inertie et glisse, virages en arc (rayon qui grandit avec la vitesse), roulis, tangage, ondulation, coups de queue à ±5 %, vitesse +30 %, bond suivi par la caméra (souris ignorée puis rendue en douceur), caméra à ressort avec avance et FOV qui suit la vitesse, 3 modes (`Classic`, `CameraOnly`, `ShiftLock`), recul et ragdoll avec traînée exponentielle et rebonds, vue de l'hameçon lissée, eau en plan ou en **sphère** (carte Ballon) |
+| `FishController.client.luau` | **C5**, remplacement complet du contrôleur de nage : inertie et glisse, virages en arc (rayon qui grandit avec la vitesse), roulis, tangage, ondulation, coups de queue à ±5 %, vitesse +30 %, bond suivi par la caméra (souris ignorée puis rendue en douceur), caméra à ressort avec avance et FOV qui suit la vitesse, 3 modes (`Classic`, `CameraOnly`, `ShiftLock`), recul et ragdoll avec traînée exponentielle et rebonds, vue de l'hameçon lissée, eau en plan ou en **sphère** (carte Ballon : le bond n'est possible que sur la calotte du haut et ne peut jamais éjecter de la bulle ; seuls un dash ou un recul le peuvent) |
 | `ClientState.luau` | Les secousses passent par du **bruit lissé** (`math.noise`) au lieu de positions aléatoires image par image, ce qui supprime les « téléportations » de caméra. Il porte aussi l'intensité et la phase de nage. L'API ne change pas. |
 | `FishAnimator.client.luau` | 6 lignes changées : la queue du poisson local suit le rythme du contrôleur. |
 | `CatchMinigame.client.luau` | **C6**, le mini-jeu « skill check » (détails en § 3) |

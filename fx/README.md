@@ -19,11 +19,11 @@ Les aperçus animés (`*_water.gif`, `*_sky.gif`) sont faits par `make_gifs.py`,
 | `fog_preview_water.png`, `fog_preview_sky.png` | aperçus sur l'eau (78, 214, 251) et sur le ciel | contrôle |
 
 - **Rendu** : volume Cycles, fumée en bruit 4D déformé (volutes), cœur (170, 20, 20), bord (255, 60, 40), vue en plongée de trois quarts (58°). La boucle est parfaite, parce que le bruit est échantillonné sur un cercle dans l'espace (z, w).
-- **Taille** : le brouillard visible (alpha > 0,2) occupe environ **82 % de la largeur** de l'image. Pour une zone de capture de rayon **17,5 studs**, la demi-largeur de la particule doit être 17,5 / 0,82 ≈ **21,3 studs** (`ParticleEmitter.Size` est une demi-largeur).
+- **Taille** : le brouillard visible (alpha > 0,2) occupe environ **85 % de la largeur** de l'image (mesuré sur les 16 images : 0,852). Pour une zone de capture de rayon **17,5 studs**, la demi-largeur de la particule doit être 17,5 / 0,852 ≈ **20,5 studs** (`ParticleEmitter.Size` est une demi-largeur).
 - **ParticleEmitter conseillé** :
   - `FlipbookLayout = Grid4x4`, `FlipbookMode = Loop`, `FlipbookFramerate = 12` (boucle de 1,33 s) ;
   - `FlipbookStartRandom = true`, `Orientation = FacingCamera`, `LightInfluence = 0.6`, `LightEmission = 0.1` ;
-  - **apparition en 0,2 s** : `Size` = {0 : 0,55 × 21,3 ; 0,2 : 21,3 ; 1 : 21,3}, et `Transparency` = {0 : 0,6 ; 0,15 : 0 ; 0,9 : 0 ; 1 : 1}.
+  - **apparition en 0,2 s** : `Size` = {0 : 0,55 × 20,5 ; 0,2 : 20,5 ; 1 : 20,5}, et `Transparency` = {0 : 0,6 ; 0,15 : 0 ; 0,9 : 0 ; 1 : 1}.
 - **Épaisseur** : ajouter 6 à 10 `fog_puff.png` (taille 6 à 10, rotation lente aléatoire, vie 0,8 à 1 s) autour du centre.
 
 ## 2. Éclair « Titan » (`titan_lightning.py`)
