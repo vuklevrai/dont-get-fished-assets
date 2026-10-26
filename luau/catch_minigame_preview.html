@@ -1,0 +1,215 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Catch Minigame Preview</title>
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@600;700&display=swap" rel="stylesheet">
+<style>
+  :root { --bg: #0b1a2e; --panel: #12243c; --text: #e8f1ff; --muted: #9db3d1; --accent: #46e15f; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text); font-family: "Fredoka", system-ui, sans-serif; }
+  .wrap { display: flex; flex-direction: column; height: 100%; }
+  canvas { flex: 1; width: 100%; min-height: 0; display: block; cursor: pointer; }
+  .bar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding: 10px 16px; background: var(--panel); }
+  .bar button { font: inherit; font-size: 15px; border: 0; border-radius: 10px; padding: 7px 14px; background: #2a4466; color: var(--text); cursor: pointer; }
+  .bar button.on { background: var(--accent); color: #062010; }
+  .bar span { color: var(--muted); font-size: 14px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <canvas id="c"></canvas>
+  <div class="bar">
+    <button data-d="0" class="on">Easy (150°/s, 110°)</button>
+    <button data-d="1">Medium (260°/s, 65°)</button>
+    <button data-d="2">Hard (380°/s, 38°)</button>
+    <button id="again">Re-hook</button>
+    <span>Clic ou Espace quand le pointeur est dans le vert. Aperçu du script luau/CatchMinigame.client.luau (mêmes couleurs, mêmes réglages).</span>
+  </div>
+</div>
+<script>
+const DIFF = [[150, 110], [260, 65], [380, 38]];
+const R = 118, T = 22, ZONE = T + 4, PERF = 12, PERFECT_SHARE = 0.3, SPIN_UP = 9;
+const TREMBLE_TIME = 0.3, TREMBLE_AMP = 7, TREMBLE_FREQ = 9, TREMBLE_DAMP = 10, TRAIL = 12;
+const C = {
+  ring: "rgb(122,20,36)", groove: "rgb(150,34,52)", flash: [255, 72, 72], ringRGB: [122, 20, 36],
+  outline: "rgb(18,10,26)", green: "rgb(70,225,95)", perfect: "rgb(225,255,170)", trail: "rgb(255,236,140)",
+  celebrate: [[90, 255, 120], [255, 232, 60], [70, 230, 255]],
+};
+const cv = document.getElementById("c"), ctx = cv.getContext("2d");
+let W = 0, H = 0, DPR = 1;
+function resize() { DPR = devicePixelRatio || 1; W = cv.clientWidth; H = cv.clientHeight; cv.width = W * DPR; cv.height = H * DPR; ctx.setTransform(DPR, 0, 0, DPR, 0, 0); }
+addEventListener("resize", resize); resize();
+
+const S = { active: false, resolved: false, angle: 0, vel: 0, dir: 1, speed: 150, arc: 110, zone: 0, pStart: 0, pArc: 30,
+  zoneShown: 0, zoneTarget: 1, tStart: 0, tUntil: 0, tBase: 0, trembling: false, scale: 1, scaleV: 0,
+  rec: [0, 0], recV: [0, 0], flash: 0, celStart: 0, celUntil: 0, outro: Infinity, screen: null, effects: [] };
+let diff = 0;
+const now = () => performance.now() / 1000;
+const rad = (d) => d * Math.PI / 180;
+const polar = (a, r) => [Math.sin(rad(a)) * r, -Math.cos(rad(a)) * r];
+const inArc = (a, from, span) => ((a - from) % 360 + 360) % 360 <= span;
+const mix = (a, b, t) => a.map((v, i) => Math.round(v + (b[i] - v) * t));
+const rgb = (c, a = 1) => `rgba(${c[0]},${c[1]},${c[2]},${a})`;
+function celebrateColor(k) { k = ((k % 3) + 3) % 3; const i = Math.floor(k); return mix(C.celebrate[i], C.celebrate[(i + 1) % 3], k - i); }
+const easeOutBack = (t) => 1 + 2.7 * Math.pow(t - 1, 3) + 1.7 * Math.pow(t - 1, 2);
+
+function placeZone() {
+  const ahead = 70 + Math.random() * Math.max(0, 360 - S.arc - 120);
+  S.zone = S.dir > 0 ? (S.angle + ahead) % 360 : ((S.angle - ahead - S.arc) % 360 + 360) % 360;
+  S.pArc = Math.max(6, S.arc * PERFECT_SHARE);
+  S.pStart = (S.zone + (S.arc - S.pArc) / 2) % 360;
+  S.zoneShown = 0; S.zoneTarget = 1;
+}
+function hook() {
+  [S.speed, S.arc] = DIFF[diff];
+  Object.assign(S, { active: true, resolved: false, angle: Math.random() * 360, vel: 0, dir: 1, tUntil: 0, trembling: false,
+    scale: 0.55, scaleV: 0, rec: [0, 0], recV: [0, 0], flash: 0, celUntil: 0, outro: Infinity, effects: [], screen: null });
+  placeZone();
+}
+function addFx(duration, step) { S.effects.push({ t: 0, duration, step }); }
+function burst(at, n) {
+  for (let i = 1; i <= n; i++) {
+    const a = (i / n) * Math.PI * 2 + Math.random() * 0.5, sp = 240 + Math.random() * 280;
+    let v = [Math.cos(a) * sp, Math.sin(a) * sp], p = [...at]; const size = 7 + Math.random() * 7, col = C.celebrate[i % 3];
+    addFx(0.55 + Math.random() * 0.3, (q, dt, g) => {
+      const k = Math.exp(-3 * dt); v = [v[0] * k, v[1] * k + 560 * dt]; p = [p[0] + v[0] * dt, p[1] + v[1] * dt];
+      const s = size * (1 - 0.6 * q);
+      g.save(); g.translate(p[0], p[1]); g.rotate(rad(45 + 200 * q)); g.fillStyle = rgb(col, 1 - q * q); g.fillRect(-s / 2, -s / 2, s, s); g.restore();
+    });
+  }
+}
+function shockwave(col) {
+  addFx(0.45, (q, dt, g) => {
+    const d = (R + T) * (1 + 0.65 * (1 - Math.pow(1 - q, 3)));
+    g.beginPath(); g.arc(0, 0, d, 0, Math.PI * 2); g.lineWidth = 1 + 9 * (1 - q); g.strokeStyle = rgb(col, 1 - q); g.stroke();
+  });
+}
+function popText(text, at, size, duration, col, rainbow) {
+  let s = 0.2, sv = 0;
+  addFx(duration, (q, dt, g) => {
+    sv += (-300 * (s - 1) - 15 * sv) * dt; s += sv * dt;
+    const fade = Math.min(1, Math.max(0, (q - 0.65) / 0.35));
+    g.save(); g.translate(at[0], at[1] - 36 * q); g.rotate(rad(Math.sin(q * Math.PI * 4) * 5 * (1 - q))); g.scale(s, s);
+    g.font = `700 ${size}px Fredoka, sans-serif`; g.textAlign = "center"; g.textBaseline = "middle";
+    g.lineWidth = 8; g.strokeStyle = rgb([18, 10, 26], 1 - fade); g.strokeText(text, 0, 0);
+    if (rainbow) {
+      const w = g.measureText(text).width, off = 0.35 * Math.sin(q * 9) * w;
+      const gr = g.createLinearGradient(-w / 2 + off, 0, w / 2 + off, 0);
+      C.celebrate.forEach((c, i) => gr.addColorStop(i / 2, rgb(c, 1 - fade))); g.fillStyle = gr;
+    } else g.fillStyle = rgb(col, 1 - fade);
+    g.fillText(text, 0, 0); g.restore();
+  });
+}
+function screenFlash(duration, from, colorAt) { S.screen = { t: 0, duration, from, colorAt }; }
+
+function escaped(perfect) {
+  S.resolved = true; const t = now(); S.celStart = t; S.celUntil = t + 0.7; S.scaleV += perfect ? 7 : 5.5;
+  burst(polar(S.angle, R), perfect ? 28 : 18); shockwave(C.celebrate[1]); if (perfect) shockwave(C.celebrate[2]);
+  popText(perfect ? "PERFECT ESCAPE!" : "ESCAPED!", [0, -8], 58, 1.25, null, true);
+  screenFlash(0.4, 0.55, (q) => celebrateColor(q * 3));
+  S.outro = t + 0.55;
+  setTimeout(() => { if (S.resolved) S.active = false; }, 0);
+}
+function missed() {
+  const t = now(); S.tStart = t; S.tUntil = t + TREMBLE_TIME; S.tBase = S.angle; S.trembling = true;
+  S.dir = -S.dir; S.vel = 0; S.zoneTarget = 0; S.flash = 1; S.scaleV -= 2;
+  const o = polar(S.angle, 1); S.recV = [S.recV[0] - o[0] * 520, S.recV[1] - o[1] * 520];
+  shakeUntil = t + 0.3;
+  screenFlash(0.3, 0.6, () => C.flash);
+  popText("-2", polar(S.angle, R + 34), 40, 0.8, C.flash, false);
+}
+function attempt() {
+  if (!S.active || S.resolved || now() < S.tUntil) return;
+  if (inArc(S.angle, S.zone, S.arc)) escaped(inArc(S.angle, S.pStart, S.pArc)); else missed();
+}
+cv.addEventListener("pointerdown", attempt);
+addEventListener("keydown", (e) => { if (e.code === "Space") { e.preventDefault(); attempt(); } });
+document.querySelectorAll("[data-d]").forEach((b) => b.addEventListener("click", () => {
+  document.querySelectorAll("[data-d]").forEach((x) => x.classList.remove("on")); b.classList.add("on"); diff = +b.dataset.d; hook();
+}));
+document.getElementById("again").addEventListener("click", hook);
+
+let shakeUntil = 0;
+function background(t) {
+  const g = ctx.createLinearGradient(0, 0, 0, H);
+  g.addColorStop(0, "#8fdcff"); g.addColorStop(0.42, "#5cc6f5"); g.addColorStop(0.43, "#4ed6fb"); g.addColorStop(1, "#2a7fc4");
+  ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+  // the hooked fish, thrashing on smooth noise (what the server patch in ConfigPatch.md does)
+  const fx = W * 0.34, fy = H * 0.42, sc = Math.min(W, H) / 700;
+  const wob = Math.sin(t * 7.3) * 0.25 + Math.sin(t * 11.1) * 0.12;
+  ctx.strokeStyle = "rgba(255,255,255,0.8)"; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(fx, 0); ctx.lineTo(fx, fy - 80 * sc); ctx.stroke();
+  ctx.save(); ctx.translate(fx, fy); ctx.rotate(Math.PI / 2 + wob); ctx.scale(sc, sc);
+  const box = (x, y, w, h, c) => { ctx.fillStyle = c; ctx.fillRect(x, y, w, h); };
+  box(-70, -28, 120, 56, "#5878bb"); box(-70, -28, 120, 22, "#22356f"); box(-70, 10, 120, 18, "#f1dfd8");
+  box(50, -22, 34, 44, "#e2cb85"); box(62, -14, 10, 10, "#141a36"); box(-110, -16, 40, 32, "#5a8796"); box(-140, -34, 34, 68, "#5a8796");
+  ctx.restore();
+}
+function drawArcBand(g, from, span, width, color) {
+  const cap = (width / 2) / R * 180 / Math.PI; let a0 = from + cap, a1 = from + span - cap;
+  if (a1 < a0) { a0 = a1 = from + span / 2; }
+  g.beginPath(); g.arc(0, 0, R, rad(a0 - 90), rad(a1 - 90) + 1e-4); g.lineWidth = width; g.lineCap = "round"; g.strokeStyle = color; g.stroke();
+}
+let last = now();
+function frame() {
+  const t = now(); let dt = Math.min(0.1, t - last); last = t;
+  if (S.active && !S.resolved) {
+    if (t < S.tUntil) { const tau = t - S.tStart; S.angle = S.tBase + TREMBLE_AMP * Math.sin(2 * Math.PI * TREMBLE_FREQ * tau) * Math.exp(-TREMBLE_DAMP * tau); }
+    else { if (S.trembling) { S.trembling = false; placeZone(); } S.vel += (S.dir * S.speed - S.vel) * (1 - Math.exp(-SPIN_UP * dt)); S.angle = ((S.angle + S.vel * dt) % 360 + 360) % 360; }
+  }
+  S.scaleV += (-260 * (S.scale - 1) - 12 * S.scaleV) * dt; S.scale += S.scaleV * dt;
+  S.recV = [S.recV[0] + (-S.rec[0] * 420 - S.recV[0] * 22) * dt, S.recV[1] + (-S.rec[1] * 420 - S.recV[1] * 22) * dt];
+  S.rec = [S.rec[0] + S.recV[0] * dt, S.rec[1] + S.recV[1] * dt];
+  S.flash = Math.max(0, S.flash - dt / 0.35);
+  if (S.zoneShown !== S.zoneTarget) S.zoneShown = S.zoneTarget > S.zoneShown ? Math.min(1, S.zoneShown + dt / 0.18) : Math.max(0, S.zoneShown - dt / 0.12);
+  const zk = S.zoneTarget > 0 ? easeOutBack(S.zoneShown) : S.zoneShown;
+  let outro = 1; if (t >= S.outro) { const p = Math.min(1, (t - S.outro) / 0.25); outro = 1 - p * p; }
+
+  // camera shake on smooth noise (sum of sines here)
+  const sh = t < shakeUntil ? (shakeUntil - t) / 0.3 : 0;
+  ctx.save(); ctx.translate(Math.sin(t * 37) * 6 * sh + Math.sin(t * 23) * 4 * sh, Math.cos(t * 31) * 5 * sh);
+  background(t); ctx.restore();
+  if (S.active || t < S.outro + 0.3) { ctx.fillStyle = "rgba(10,14,30,0.22)"; ctx.fillRect(0, 0, W, H); }
+
+  const base = Math.max(0.55, Math.min(1.3, H / 1000 * 1.25));
+  const cx = W * (W < 700 ? 0.5 : 0.7), cy = H * (W < 700 ? 0.58 : 0.55);
+  // ring
+  ctx.save(); ctx.translate(cx + S.rec[0] * base, cy + S.rec[1] * base); const k = base * Math.max(0, S.scale) * outro; ctx.scale(k, k);
+  if (k > 0.01) {
+    ctx.beginPath(); ctx.arc(0, 0, R, 0, Math.PI * 2); ctx.lineWidth = T + 7; ctx.strokeStyle = C.outline; ctx.stroke();
+    if (t < S.celUntil) {
+      for (let a = 0; a < 360; a += 3) { ctx.beginPath(); ctx.arc(0, 0, R, rad(a - 90), rad(a + 3.6 - 90)); ctx.lineWidth = T; ctx.strokeStyle = rgb(celebrateColor(a / 360 * 3 + (t - S.celStart) * 5)); ctx.stroke(); }
+    } else {
+      ctx.beginPath(); ctx.arc(0, 0, R, 0, Math.PI * 2); ctx.lineWidth = T; ctx.strokeStyle = rgb(mix(C.ringRGB, C.flash, S.flash)); ctx.stroke();
+      ctx.beginPath(); ctx.arc(0, 0, R, 0, Math.PI * 2); ctx.lineWidth = T * 0.3; ctx.strokeStyle = C.groove; ctx.stroke();
+    }
+    if (zk > 0.02) { drawArcBand(ctx, S.zone, S.arc, ZONE * zk, C.green); drawArcBand(ctx, S.pStart, S.pArc, PERF * zk, C.perfect); }
+    // trail, needle, tip
+    const dir = Math.abs(S.vel) > 1 ? Math.sign(S.vel) : S.dir, sp = Math.min(7, Math.max(1.2, Math.abs(S.vel) * 0.012));
+    let gp = polar(S.angle, R); ctx.beginPath(); ctx.arc(gp[0], gp[1], 23, 0, Math.PI * 2); ctx.fillStyle = "rgba(255,236,140,0.4)"; ctx.fill();
+    for (let i = 1; i <= TRAIL; i++) { const p = polar(S.angle - dir * sp * i, R); ctx.beginPath(); ctx.arc(p[0], p[1], (T - i) / 2, 0, Math.PI * 2); ctx.fillStyle = `rgba(255,236,140,${0.75 - 0.7 * i / TRAIL})`; ctx.fill(); }
+    for (let i = 1; i <= 8; i++) { const p = polar(S.angle, 18 + (R - 30) * i / 8); ctx.beginPath(); ctx.arc(p[0], p[1], (5 + i * 0.7) / 2, 0, Math.PI * 2); ctx.fillStyle = "#fff"; ctx.fill(); }
+    ctx.beginPath(); ctx.arc(0, 0, 15, 0, Math.PI * 2); ctx.fillStyle = "#f5f5fa"; ctx.fill(); ctx.lineWidth = 3; ctx.strokeStyle = C.outline; ctx.stroke();
+    const inside = S.active && !S.resolved && inArc(S.angle, S.zone, S.arc);
+    ctx.beginPath(); ctx.arc(gp[0], gp[1], 13, 0, Math.PI * 2); ctx.fillStyle = inside ? "rgb(172,238,183)" : "#fff"; ctx.fill(); ctx.lineWidth = 3; ctx.strokeStyle = C.outline; ctx.stroke();
+  }
+  ctx.restore();
+  // texts and effects (not scaled by the bounce)
+  ctx.save(); ctx.translate(cx, cy); ctx.scale(base, base);
+  if (S.active && !S.resolved) {
+    const ts = 1 + 0.035 * Math.sin(t * 6); ctx.save(); ctx.translate(0, -(R + T + 46)); ctx.scale(ts, ts);
+    ctx.font = "700 40px Fredoka, sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.lineWidth = 6; ctx.strokeStyle = "rgb(120,10,10)"; ctx.strokeText("YOU'VE BEEN HOOKED!", 0, 0); ctx.fillStyle = "#fff"; ctx.fillText("YOU'VE BEEN HOOKED!", 0, 0); ctx.restore();
+    ctx.font = "700 19px Fredoka, sans-serif"; ctx.textAlign = "center"; ctx.lineWidth = 4; ctx.strokeStyle = "rgb(10,30,10)"; ctx.strokeText("CLICK or SPACE when the pointer is in the GREEN zone!", 0, R + T + 36); ctx.fillStyle = "rgb(200,255,200)"; ctx.fillText("CLICK or SPACE when the pointer is in the GREEN zone!", 0, R + T + 36);
+  }
+  for (let i = S.effects.length - 1; i >= 0; i--) { const e = S.effects[i]; e.t += dt; const q = Math.min(1, e.t / e.duration); e.step(q, dt, ctx); if (q >= 1) S.effects.splice(i, 1); }
+  ctx.restore();
+  if (S.screen) { const s = S.screen; s.t += dt; const q = Math.min(1, s.t / s.duration); ctx.fillStyle = rgb(s.colorAt(q), (1 - s.from) * (1 - q)); ctx.fillRect(0, 0, W, H); if (q >= 1) S.screen = null; }
+  if (!S.active && t > S.outro + 1.4 && S.effects.length === 0) hook();
+  requestAnimationFrame(frame);
+}
+hook(); requestAnimationFrame(frame);
+window.__S = S; window.__escaped = escaped; window.__missed = missed;
+</script>
+</body>
+</html>
