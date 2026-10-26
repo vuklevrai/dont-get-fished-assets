@@ -7,6 +7,7 @@ blender -b --factory-startup --python fx/<script>.py -- <dossier_de_sortie>
 ```
 
 Ils tournent aussi sous Windows avec Blender 5.2. `fog_flipbook.py` utilise Cycles (volume), les autres dessinent en 2D avec numpy (`fxlib.py`) et enregistrent via Blender.
+Les aperçus animés (`*_water.gif`, `*_sky.gif`) sont faits par `make_gifs.py`, qui demande Python et Pillow, sans Blender.
 
 ## 1. Brouillard de capture, rouge et réaliste (`fog_flipbook.py`)
 

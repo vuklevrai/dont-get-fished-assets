@@ -1,0 +1,35 @@
+{
+ "v": 1,
+ "model": "FishingBoat",
+ "origin": "waterline, centre of the hull; bow towards -Z",
+ "length": 26.0,
+ "beam": 10.0,
+ "primitives": 232,
+ "FishermanStand": {
+  "pos": [
+   0.0,
+   4.6,
+   10.6
+  ],
+  "quat": [
+   0.0,
+   0.0,
+   0.0,
+   1.0
+  ],
+  "cframe": [
+   0.0,
+   4.6,
+   10.6,
+   1.0,
+   0.0,
+   0.0,
+   0.0,
+   1.0,
+   0.0,
+   0.0,
+   0.0,
+   1.0
+  ]
+ }
+}
