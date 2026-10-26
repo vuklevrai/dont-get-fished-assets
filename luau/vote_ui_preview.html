@@ -1,0 +1,173 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Vote UI Preview</title>
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --outline: #1c1e30; --br: #2892e2; --sv: #be285a; --glow: #fff08c; --bar: #ffe25c; --muted: #9db3d1;
+    --panel: #12243c; --text: #e8f1ff;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; font-family: "Fredoka", "Fredoka One", system-ui, sans-serif; color: var(--text); }
+  body { background: #0b1a2e; display: flex; flex-direction: column; }
+  /* a stand-in for the game view: sky, the pirate ship deck colour band, the sea */
+  .scene { position: relative; flex: 1; min-height: 0; overflow: hidden;
+    background: linear-gradient(#8fd0ff 0%, #bfe6ff 46%, #4ed6fb 47%, #2aa6d8 100%); }
+  .scene::after { content: ""; position: absolute; left: 8%; right: 8%; bottom: 0; height: 30%;
+    background: linear-gradient(#8a5a32, #6b4426); border-radius: 40px 40px 0 0; opacity: .55; }
+  .txt { color: #fff; -webkit-text-stroke: 0; text-shadow:
+    -2px -2px 0 var(--outline), 2px -2px 0 var(--outline), -2px 2px 0 var(--outline), 2px 2px 0 var(--outline),
+    0 2px 0 var(--outline), 0 -2px 0 var(--outline), 2px 0 0 var(--outline), -2px 0 0 var(--outline); }
+  .panel { position: absolute; left: 50%; bottom: 28px; width: 626px; height: 260px; transform-origin: 50% 100%;
+    transition: transform .35s cubic-bezier(.34,1.56,.64,1), opacity .25s; z-index: 2; }
+  .panel.closed { transform: translate(-50%, 300px) scale(var(--fit)); opacity: 0; }
+  .panel.open { transform: translate(-50%, 0) scale(var(--fit)); }
+  .countdown { position: absolute; top: 0; left: 0; right: 0; height: 40px; text-align: center; font-size: 30px; line-height: 40px; }
+  .countdown.hot { color: #ff6060; animation: pop .3s; }
+  @keyframes pop { from { transform: scale(1.25); } to { transform: scale(1); } }
+  .card { position: absolute; top: 52px; width: 300px; height: 196px; border-radius: 22px; cursor: pointer;
+    border: 5px solid var(--outline); transition: transform .12s, border-color .2s, box-shadow .2s; overflow: visible; }
+  .card:hover { transform: scale(1.04); }
+  .card.br { left: 0; background: linear-gradient(var(--br), color-mix(in srgb, var(--br) 70%, #000)); }
+  .card.sv { left: 326px; background: linear-gradient(var(--sv), color-mix(in srgb, var(--sv) 70%, #000)); }
+  .card.chosen { border-width: 7px; border-color: var(--glow); box-shadow: 0 0 22px rgba(255, 240, 140, .65); animation: glow 1s infinite alternate; }
+  @keyframes glow { from { border-color: var(--glow); } to { border-color: #fffbe3; } }
+  .medal { position: absolute; left: 16px; top: 20px; width: 84px; height: 84px; border-radius: 42px; border: 4px solid var(--outline);
+    display: flex; align-items: center; justify-content: center; font-size: 46px; }
+  .br .medal { background: color-mix(in srgb, var(--br) 75%, #000); }
+  .sv .medal { background: color-mix(in srgb, var(--sv) 75%, #000); }
+  .crown { position: absolute; left: 32px; top: -16px; font-size: 32px; transform: rotate(18deg); }
+  .title { position: absolute; left: 112px; top: 18px; right: 12px; font-size: 24px; line-height: 38px; white-space: nowrap; } /* TextScaled in Roblox */
+  .desc { position: absolute; left: 112px; top: 60px; right: 12px; font-size: 18px; line-height: 22px; }
+  .track { position: absolute; left: 16px; right: 70px; bottom: 16px; height: 24px; border-radius: 12px; border: 3px solid var(--outline);
+    background: rgba(24, 26, 40, .65); overflow: hidden; }
+  .fill { height: 100%; width: 0; background: var(--bar); border-radius: 10px; transition: width .25s; }
+  .count { position: absolute; right: 14px; bottom: 8px; width: 60px; text-align: right; font-size: 34px; line-height: 40px; }
+  .tag { position: absolute; left: 50%; top: -13px; transform: translateX(-50%); width: 150px; height: 26px; border-radius: 13px;
+    background: var(--outline); color: #ffec78; font-size: 18px; line-height: 26px; text-align: center; display: none; }
+  .chosen .tag { display: block; }
+  .veil { position: absolute; inset: 0; border-radius: 17px; background: rgba(70, 72, 84, .8); display: none; z-index: 3; }
+  .locked .veil { display: block; }
+  .locked { cursor: not-allowed; }
+  .locked:hover { transform: none; }
+  .lock { position: absolute; left: 0; right: 0; top: 28px; text-align: center; font-size: 50px; }
+  .locktext { position: absolute; left: 0; right: 0; top: 120px; text-align: center; font-size: 24px; }
+  .result { position: absolute; left: 50%; top: 42%; transform: translate(-50%, -50%) scale(var(--fit)); text-align: center; z-index: 3;
+    pointer-events: none; opacity: 0; transition: opacity .3s; }
+  .result.show { opacity: 1; animation: resultPop .35s cubic-bezier(.34,1.56,.64,1); }
+  @keyframes resultPop { from { transform: translate(-50%, -50%) scale(calc(var(--fit) * .5)); } to { transform: translate(-50%, -50%) scale(var(--fit)); } }
+  .result .sub { font-size: 30px; }
+  .result .big { font-size: 84px; line-height: 100px; }
+  .bar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding: 10px 16px; background: var(--panel); }
+  .bar button { font: inherit; font-size: 15px; border: 0; border-radius: 10px; padding: 7px 14px; background: #2a4466; color: var(--text); cursor: pointer; }
+  .bar button.on { background: #46e15f; color: #062010; }
+  .bar span { color: var(--muted); font-size: 14px; }
+</style>
+</head>
+<body>
+<div class="scene" id="scene">
+  <div class="panel closed" id="panel">
+    <div class="countdown txt" id="countdown">VOTE ENDS IN 10</div>
+    <div class="card br" id="BattleRoyale">
+      <div class="tag">YOUR VOTE</div>
+      <div class="medal"><span>🐟</span><span class="crown">👑</span></div>
+      <div class="title txt">BATTLE ROYALE</div>
+      <div class="desc txt">Last fish alive wins</div>
+      <div class="track"><div class="fill"></div></div>
+      <div class="count txt">0</div>
+      <div class="veil"><div class="lock">🔒</div><div class="locktext txt">3 players minimum</div></div>
+    </div>
+    <div class="card sv" id="Survival">
+      <div class="tag">YOUR VOTE</div>
+      <div class="medal"><span>💀</span></div>
+      <div class="title txt">SURVIVAL</div>
+      <div class="desc txt">Survive waves of fishermen and zombie fish</div>
+      <div class="track"><div class="fill"></div></div>
+      <div class="count txt">0</div>
+      <div class="veil"><div class="lock">🔒</div><div class="locktext txt">3 players minimum</div></div>
+    </div>
+  </div>
+  <div class="result" id="result"><div class="sub txt">NEXT ROUND</div><div class="big txt" id="resultText">SURVIVAL!</div></div>
+</div>
+<div class="bar">
+  <button id="open">Open the vote (10 s)</button>
+  <button id="lock">Battle Royale locked (fewer than 3 players)</button>
+  <button id="close">Close now</button>
+  <span>Click a card or press 1 / 2. Preview of luau/VoteUi.client.luau (same sizes, colours and timings; Roblox shows FredokaOne).</span>
+</div>
+<script>
+  const S = { open: false, locked: false, mine: null, votes: { BattleRoyale: 0, Survival: 0 }, endsAt: 0, others: [] };
+  window.__S = S;
+  const $ = (id) => document.getElementById(id);
+  const cards = { BattleRoyale: $("BattleRoyale"), Survival: $("Survival") };
+  const TITLES = { BattleRoyale: ["BATTLE ROYALE!", "#2892e2"], Survival: ["SURVIVAL!", "#be285a"] };
+  function fit() {
+    const r = $("scene").getBoundingClientRect();
+    const f = Math.max(0.45, Math.min(1.2, Math.min(r.width / 1100, r.height / 640)));
+    document.documentElement.style.setProperty("--fit", f);
+  }
+  function refresh() {
+    const total = S.votes.BattleRoyale + S.votes.Survival;
+    for (const id in cards) {
+      const c = cards[id];
+      c.querySelector(".fill").style.width = (total ? S.votes[id] / total * 100 : 0) + "%";
+      c.querySelector(".count").textContent = S.votes[id];
+      c.classList.toggle("chosen", S.mine === id && !(id === "BattleRoyale" && S.locked));
+      c.classList.toggle("locked", id === "BattleRoyale" && S.locked);
+    }
+  }
+  function vote(id) {
+    if (!S.open || (id === "BattleRoyale" && S.locked)) return;
+    if (S.mine) S.votes[S.mine]--;
+    S.mine = id;
+    S.votes[id]++;
+    refresh();
+  }
+  function open() {
+    S.open = true; S.mine = null; S.endsAt = performance.now() + 10000;
+    S.votes = { BattleRoyale: S.locked ? 0 : 2, Survival: 1 };
+    $("panel").className = "panel open";
+    $("result").classList.remove("show");
+    refresh();
+  }
+  function close() {
+    if (!S.open) return;
+    S.open = false;
+    $("panel").className = "panel closed";
+    const winner = (S.locked || S.votes.Survival >= S.votes.BattleRoyale) ? "Survival" : "BattleRoyale";
+    $("resultText").textContent = TITLES[winner][0];
+    $("resultText").style.color = TITLES[winner][1];
+    const r = $("result");
+    r.classList.remove("show"); void r.offsetWidth; r.classList.add("show");
+    setTimeout(() => r.classList.remove("show"), 2000);
+  }
+  let last = -1;
+  function tick() {
+    fit();
+    if (S.open) {
+      const left = Math.max(0, Math.ceil((S.endsAt - performance.now()) / 1000));
+      const el = $("countdown");
+      el.textContent = "VOTE ENDS IN " + left;
+      if (left !== last) {
+        last = left;
+        el.classList.toggle("hot", left <= 3);
+        if (left <= 3) { el.classList.remove("hot"); void el.offsetWidth; el.classList.add("hot"); }
+      }
+      if (left === 0) close();
+    }
+    requestAnimationFrame(tick);
+  }
+  for (const id in cards) cards[id].addEventListener("click", () => vote(id));
+  addEventListener("keydown", (e) => { if (e.key === "1") vote("BattleRoyale"); if (e.key === "2") vote("Survival"); });
+  $("open").onclick = open;
+  $("close").onclick = close;
+  $("lock").onclick = () => { S.locked = !S.locked; $("lock").classList.toggle("on", S.locked); if (S.locked && S.mine === "BattleRoyale") { S.votes.BattleRoyale--; S.mine = null; } if (S.locked) S.votes.BattleRoyale = 0; refresh(); };
+  window.__vote = vote; window.__open = open; window.__close = close;
+  open();
+  tick();
+</script>
+</body>
+</html>

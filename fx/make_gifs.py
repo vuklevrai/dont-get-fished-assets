@@ -13,6 +13,8 @@ SHEETS = [
     ("fog_flipbook_8x8.png", 8, 30, True),
     ("titan_lightning_flipbook.png", 4, 27, False),
     ("zone_wall_flipbook.png", 4, 12, True),
+    ("aim_beam_flipbook.png", 4, 10, True),
+    ("explosion_flipbook.png", 4, 21, False),
 ]
 BACKGROUNDS = {"water": (78, 214, 251), "sky": (150, 205, 245)}
 

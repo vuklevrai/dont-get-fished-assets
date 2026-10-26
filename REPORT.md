@@ -1,103 +1,222 @@
-# Rapport de la session cloud — Don't Get Fished, phase d'amélioration
+# Rapport — brief cloud n° 2 (branche `cloud-assets-2`)
 
-Branche `cloud-assets`. Les six tâches du brief (C1 à C6) sont livrées. **Rien n'a pu être testé dans Roblox Studio** : le code Luau a été relu ligne par ligne et passé dans un vérificateur de structure maison, la physique de nage a été simulée en Python, et tous les visuels ont été rendus et regardés. Les réglages finaux se feront en jouant.
+Les quatre tâches du brief sont faites et vérifiées hors de Studio :
+- **C1** : décor de l'Océan ;
+- **C2** : armes ;
+- **C3** : textures ;
+- **C4** : modules Luau.
+
+Le travail part de `cloud-assets` et reprend ses outils sans les casser : `dgf_maps.py`, `build_maps.py`, `fxlib.py`, `make_gifs.py`. Le rapport du premier brief s'appelle maintenant `REPORT_BRIEF1.md`.
+
+Les exports Studio du 26/10 sont dans `studio_export/` (fichiers `.rbxm` et scripts extraits dans `src/`). Ils ont servi à caler les modules sur le code actuel : `FxAssets`, `ClientState`, `MapService`, `Effects` et `ZoneWallAnimator`.
+
+Le README de chaque dossier détaille tout :
+- `maps/README.md` (section « Brief 2 ») ;
+- `fx/README.md` (sections 6 à 8) ;
+- `luau/README.md`.
+
+---
 
 ## 1. Fichiers produits
 
-### Code Luau (`luau/`)
+### C1 — Décor de l'Océan (`maps/ocean_decor/`)
+
 | Fichier | Rôle |
 |---|---|
-| `FishController.client.luau` | **C5**, remplacement complet du contrôleur de nage : inertie et glisse, virages en arc (rayon qui grandit avec la vitesse), roulis, tangage, ondulation, coups de queue à ±5 %, vitesse +30 %, bond suivi par la caméra (souris ignorée puis rendue en douceur), caméra à ressort avec avance et FOV qui suit la vitesse, 3 modes (`Classic`, `CameraOnly`, `ShiftLock`), recul et ragdoll avec traînée exponentielle et rebonds, vue de l'hameçon lissée, eau en plan ou en **sphère** (carte Ballon : le bond n'est possible que sur la calotte du haut et ne peut jamais éjecter de la bulle ; seuls un dash ou un recul le peuvent) |
-| `ClientState.luau` | Les secousses passent par du **bruit lissé** (`math.noise`) au lieu de positions aléatoires image par image, ce qui supprime les « téléportations » de caméra. Il porte aussi l'intensité et la phase de nage. L'API ne change pas. |
-| `FishAnimator.client.luau` | 6 lignes changées : la queue du poisson local suit le rythme du contrôleur. |
-| `CatchMinigame.client.luau` | **C6**, le mini-jeu « skill check » (détails en § 3) |
-| `ConfigPatch.md` | Les constantes à modifier ou ajouter dans `Config`, les attributs utilisés, et des patchs serveur conseillés : tremblement lissé du poisson pris à l'hameçon, recul selon la masse. |
-| `MOVEMENT_DESIGN.md` | Le modèle de nage expliqué, les mesures, un tableau « ressenti → paramètre » pour régler, et une liste de tests à faire dans Studio. |
-| `catch_minigame_preview.html` / `.png` | Aperçu **jouable** du mini-jeu dans un navigateur, et une planche de 3 états. |
+| `megalodon_fossil.json` / `_data.png` | Squelette de mégalodon, 459 primitives |
+| `corals.json` / `_data.png` | Les 6 coraux en une seule table, assets `Coral1` à `Coral6` |
+| `spots.json` | `FossilSpot`, 60 `CoralSpots` (`variant`, `scale`), 43 `SeaweedSpots` (`height`), plus `fossil_checks`, `stats` et `primitives` |
+| `previews/*.png` | Fossile (2 vues), coraux, arène sous l'eau (2 vues), vue de dessus |
 
-### Effets (`fx/`) — détails et réglages Roblox dans `fx/README.md`
+### C2 — Armes (`models/`)
+
 | Fichier | Rôle |
 |---|---|
-| `fog_flipbook.png` (4×4 de 256²), `fog_flipbook_8x8.png` (8×8 de 128²), `fog_puff.png` (512²) | **C4.1**, brouillard de capture rouge et réaliste : volume Cycles, boucle parfaite, plongée de trois quarts |
-| `titan_lightning_flipbook.png` (4×4 de 256²), `titan_flash_ring.png` (512²) | **C4.2**, éclair Titan cartoon (amorce, impact, flash, ramifications, fumée noire) et onde de choc |
-| `speed_line.png` (256×32), `speed_lines_screen.png` et `_b.png` (1024²) | **C4.3**, lignes de vitesse du dash |
-| `low_hp_vignette.png` (1024²) | **C4.4**, vignette rouge de quasi-mort |
-| `zone_wall_flipbook.png` (4×4, se répète à l'horizontale), `zone_wall_static.png` (512²) | **C3**, mur de zone style tempête Fortnite |
-| `*_preview_water.png`, `*_preview_sky.png`, `*_water.gif`, `*_sky.gif`, `zone_wall_tiling_check.png` | Aperçus (planches et GIF animés) sur l'eau (78, 214, 251) et sur le ciel |
-| `fog_flipbook.py`, `titan_lightning.py`, `screen_fx.py`, `zone_wall.py`, `fxlib.py` | Générateurs Blender déterministes |
-| `make_gifs.py` | Les GIF d'aperçu (Python et Pillow, sans Blender) |
+| `harpoon_gun.json`, `harpoon.json`, `bazooka.json`, `missile.json` (et leurs `_data.png`) | Les 4 tables d'armes |
+| `weapons_spots.json` | `Muzzle`, `RopeAttach`, `Exhaust`, etc., en coordonnées locales |
+| `previews/harpoon_gun_preview.png`, `harpoon_preview.png`, `bazooka_preview.png`, `missile_preview.png`, `weapons_lineup_preview.png` | Aperçus ; la dernière vue montre les 4 armes à côté d'une silhouette R15 pour l'échelle |
 
-### Cartes et modèles (`maps/`, `models/`) — détails dans `maps/README.md`
+### C3 — Textures (`fx/`)
+
 | Fichier | Rôle |
 |---|---|
-| `maps/aquarium/aquarium.json`, `aquarium_data.png`, `spots.json`, `previews/` | **C1**, carte Aquarium |
-| `models/futuristic_pod.json`, `futuristic_pod_data.png` | **C1**, modèle `FuturisticPod` réutilisable |
-| `maps/ballon/ballon_platforms.json`, `_data.png`, `spots.json`, `previews/` | **C2**, carte Ballon : plateformes flottantes et placement des pods |
-| `models/fishing_boat.json`, `_data.png`, `fishing_boat_spots.json` | **C3**, bateau de pêche et son point `FishermanStand` |
-| `models/island.json`, `_data.png` | **C3**, île et palmier |
-| `maps/ocean/ocean_markers.json`, `_data.png`, `spots.json`, `previews/` | **C3**, disposition de l'océan : panneaux du mur de zone, 10 bateaux, île, arène |
-| `models/previews/` | Aperçus du pod, du bateau et de l'île |
-| `maps/dgf_maps.py`, `maps/build_maps.py` | Générateurs (géométrie, puis export et rendus Blender) |
+| `aim_beam_flipbook.png` | Colonne de visée du harpon : planche 4×4, boucle, tuilable verticalement |
+| `explosion_flipbook.png` | Explosion cartoon : planche 4×4, une seule passe |
+| `smoke_puff.png`, `bubble.png`, `shard_spark.png` | Fumée, bulle, étincelle |
+| `aim_ring.png`, `missile_reticle.png`, `shockwave_ring.png`, `missile_flame.png` | Cercle de danger, viseur, onde de choc, flamme de tuyère (textures en plus du brief, utilisées par `WeaponFx`) |
+| `aim_beam.py`, `weapon_fx.py` | Générateurs. `make_gifs.py` gère aussi les deux nouvelles planches. |
+| `*_preview_*.png`, `*_flipbook_*.gif`, `aim_beam_tiling_check.png`, `weapon_fx_preview_*.png` | Aperçus |
 
-### Entrées rangées dans le dépôt
-- `studio_export/` : les 3 exports `.rbxm` (binaires) et les **26 scripts extraits en clair** dans `src/`, plus `GameServer`.
-- `references/` : les 5 images de référence.
-- `pour_github/` : ce que tu as déposé (notes, brief, scripts de référence).
+### C4 — Luau (`luau/`)
 
-## 2. Les cartes
+| Fichier | Rôle |
+|---|---|
+| `WeaponFx.luau` | Effets des pêcheurs à harpon et à bazooka |
+| `Disintegrate.luau` | Élimination d'un poisson bloc par bloc |
+| `Bubbles.luau` | Bulles d'ambiance et `burst` |
+| `VoteUi.client.luau` | Vote du mode de jeu (LocalScript) |
+| `WeaponModels.luau` | **Généré** : construit les 4 armes en Luau à partir des tables, sans import |
+| `FxAssets.luau` | Remplace l'actuel : mêmes ids, plus 9 nouvelles clés |
+| `README.md` | Contrats et exemples d'appel |
+| `vote_ui_preview.html` et `vote_ui_preview*.png` | Maquette fidèle du vote, en 3 captures : vote en cours, Battle Royale verrouillée, résultat |
 
-| Carte / modèle | Dimensions réelles | Primitives | Points d'ancrage |
-|---|---|---|---|
-| **Aquarium** | eau de 324 × 252, surface à y = −1, sable vers −86 (environ 85 à 90 de profondeur), verre de 2 d'épaisseur jusqu'à y = +8, rebord jusqu'à +11, meuble dessous | **1 419** / 4 000 | 10 `FishermanSpots` (sol des pods à y = 11, regard vers le centre), 22 `SeaweedSpots`, `PlayerSpawnVolume` (300 × 60 × 228), 24 `PlayerSpawnPoints` vérifiés, axes des 4 tunnels du rocher, château, arche |
-| └ gros rocher | environ 91 × 45 × 70, creux, avec 4 passages de 13 à 14 studs (environ 11 libres) | 823 avec les petits rochers | — |
-| └ mini château | 46 × 32 × 46, portes de 14 × 17, fenêtres de 10 × 10, 4 tours | 116 | — |
-| **FuturisticPod** | disque de 16 + rampe de 6, hauteur environ 13 avec l'arche | **78** / 300 | origine = sol du pod, regard vers −Z |
-| **Ballon** | sphère de rayon 110 en (0, 0, 0) (eau faite en local), 10 pods de y ≈ −6 à y ≈ 60 | **190** (plateformes) | 10 `FishermanSpots`, bout de rampe à exactement 8 de la bulle, `PlayerSpawnVolume` (cube de 111), `PlayerSpawnSphere` (r = 88), 24 `PlayerSpawnPoints`, attributs à poser |
-| **Océan** | boîte de 1 200 × 1 200, arène de 300 × 240, mur de y = −60 à +40 | **4** (mur de zone) | 10 `BoatSpots` (proue vers le centre, au moins 3 studs hors du mur), 10 `FishermanSpots` en coordonnées monde, `IslandSpot` (200, −1, −470), `PlayerSpawnVolume`, 24 `PlayerSpawnPoints` |
-| **FishingBoat** | 26 × 10, hauteur environ 14 avec le mât | **232** / 600 | `FishermanStand` en (0 ; 4,6 ; 10,6), regard vers la proue |
-| **Island** | environ 34 de large, palmier d'environ 20 de haut | **96** | origine sur la ligne d'eau |
+### Outils et autres fichiers
 
-Tous les matériaux sont dans la liste autorisée. Toutes les rotations ont été vérifiées : orthonormées, déterminant +1. Chaque image de données est relue pour vérifier qu'elle redonne exactement son JSON : par Blender au moment de l'export, puis une seconde fois par Pillow, octet par octet. Les aperçus de chaque carte sont dans son dossier `previews/`, nommés `*_preview.png`.
+| Fichier | Rôle |
+|---|---|
+| `maps/dgf_props.py` | Géométrie du fossile, des coraux, des points d'ancrage, des armes, et contrôles de passage |
+| `maps/build_maps.py` | Nouvelles cibles `ocean_decor` et `weapons` (export, aperçus, génération de `WeaponModels.luau`) |
+| `CLOUD_BRIEF2.md`, `pour_github2/` | Le brief, `NOTES_PROJET.md` à jour et le prompt d'origine |
+| `deliverables2.zip` | Tout ce qui est utile à la session locale (voir la fin du rapport) |
 
-## 3. Réglages clés
+---
 
-### Nage (`Config`, voir `luau/ConfigPatch.md`)
-| Réglage | Valeur | Effet mesuré (simulation à 60 images/s) |
+## 2. Modèles
+
+| Modèle | Primitives (budget) | Origine | Orientation | Collision |
+|---|---|---|---|---|
+| `MegalodonFossil` | **459** (≤ 1 200) | centre du dessous, posé sur y = 0 | tête vers −Z ; à placer en `FossilSpot` (60, −46, −40) avec sa rotation | crâne, mâchoires et vertèbres uniquement (73 primitives) |
+| `Coral1` à `Coral6` | 58 / 107 / 98 / 43 / 42 / 91 (de 40 à 120) | centre de la base, y = 0 | lacet aléatoire dans les points d'ancrage ; échelle de 0,8 à 1,6 avec `ScaleTo` | aucune |
+| `HarpoonGun` | **58** (≤ 250), dont 26 pour le groupe `Harpoon` | la poignée (main droite) | canon vers −Z | aucune |
+| `Harpoon` | **26** | la pointe | vol vers −Z ; `RopeAttach` en (0, 0, 7,38) | aucune |
+| `Bazooka` | **40**, dont 13 pour le groupe `Missile` | la poignée | canon vers −Z | aucune |
+| `Missile` | **13** | le nez | vol vers −Z ; `Exhaust` en (0, 0, 3,82), regard vers +Z | aucune |
+
+**Fossile (vérification).** On peut **nager entre les côtes** : 3 passages latéraux de 11,45, 11,45 et 11,52 studs de diamètre libre (11 demandés).
+- **Méthode** : la distance exacte, primitive par primitive, comme pour les tunnels de l'Aquarium.
+- **Cage, dans la longueur** : au moins 11 studs sur 38 studs.
+- **Dimensions** : 90 studs de long, 33 de haut. Gueule ouverte, double rangée de dents en `Wedge`, vertèbres séparées, côtes courbes, nageoires pectorales, dorsale et caudale osseuses, fissures et mousse.
+
+**Points d'ancrage du décor.**
+- **Coraux** : 60 points, dont 40 dans l'arène en 11 bosquets et 20 dehors jusqu'à ±500.
+- **Algues** : 43 points (30 dedans, 13 dehors), `height` de 18 à 40.
+- **Distance aux points d'apparition** : tout reste à **25 studs ou plus** de chaque `PlayerSpawnPoint`, sur toute sa hauteur (minimum mesuré 25,1).
+- **Fossile** : le point d'apparition le plus proche est à 17 studs de l'os le plus proche.
+
+---
+
+## 3. Textures
+
+| Texture | Taille et disposition | Réglages conseillés (ceux de `WeaponFx`) |
 |---|---|---|
-| `SWIM_SPEED` | 20 → **26** | +30 % |
-| `SWIM_ACCEL` | 5 | 0 → 90 % de la croisière en 0,47 s |
-| `SWIM_GLIDE_DRAG`, `SWIM_GLIDE_BRAKE` | 2,2 / 6 | glisse sous 3 studs/s en 0,73 s, arrêt en 1,07 s (environ 9 studs) |
-| `SWIM_TURN_RATE`, `SWIM_TURN_FALLOFF`, `SWIM_TURN_SHARPNESS` | 10 / 60 / 14 | 90° en 0,30 s. Demi-tour en arc : environ 8 studs à 26 studs/s, 14 à 39, 20 à 52. |
-| `SWIM_LATERAL_DRAG`, `SWIM_CARVE` | 14 / 0,85 | vitesse conservée dans les virages, dérapage maximal d'environ 20° |
-| `SWIM_PULSE`, `SWIM_UNDULATION` | 0,05 / 0,06 rad | coups de queue de ±5 %, en phase avec l'animation |
-| `DASH_SPEED` | 75 → **97** | dash d'environ 41 studs, retour à la croisière en environ 0,7 s |
-| `LEAP_HEIGHT`, `LEAP_DISTANCE`, `LEAP_TIME` | 7 → **10**, 24 → 30, 1,0 → 1,1 | bond plus haut, caméra automatique, souris rendue en 0,35 s |
-| `STUN_DRAG` (+ `STUN_DRAG_QUAD`) | 0,92/s | environ 60 % de vitesse perdue par seconde. Impulsion 45 → 43 studs parcourus, 80 → 73. |
-| `CAMERA_FOLLOW`, `CAMERA_LEAD`, `CAMERA_FOV_SPEED` | 10 / 0,08 s / +12° | caméra à ressort sans dépassement, avance dans la direction de nage, FOV qui monte avec la vitesse |
+| `aim_beam_flipbook.png` | 1024², 4×4 de 256², boucle de 16 images ; **chaque image se raccorde en haut et en bas** ; bords gauche et droit fondus (alpha 0), alpha 0,89 au centre, corps dense sur 83 % de la largeur | 3 quads verticaux croisés (2 en mode performance), avec un `SurfaceGui` (`PixelsPerStud = 256 / diamètre`) sur chaque face.<br>Des `ImageLabel` empilés, une tuile par diamètre de hauteur, `ImageRectSize` 256.<br>Une case de plus **toutes les 1/10 s**, `LightInfluence` 0, `ImageTransparency` 0,1.<br>Mesures : écart à la couture 0,0184, contre 0,0181 entre deux lignes voisines ; image 15 → image 0 : 0,025, contre 0,024 entre deux images. |
+| `explosion_flipbook.png` | 1024², 4×4, une seule passe ; centre en (0,5 ; 0,53) ; la boule de feu couvre 71 % de l'image ; rien ne touche les bords | `ParticleEmitter` en `Grid4x4` et `OneShot`, `Lifetime` 0,75.<br>**`Size` = 1,41 × rayon**, `FacingCamera`, `LightInfluence` 0, `LightEmission` 0,15.<br>Deuxième couche tournée de 180° (sauf en mode performance). |
+| `smoke_puff.png` | 256² | Traînée : `Rate` 45 (22), `Lifetime` de 0,7 à 1,1, `Size` de 0,7 à 3,2, `Transparency` 0,15 puis 0,5 puis 1, `RotSpeed` ±60, `Drag` 1,5 |
+| `bubble.png` | 128² | `BillboardGui` de 0,35 à 0,9 stud (jusqu'à 1,8 fois en montant), `LightInfluence` 0 |
+| `shard_spark.png` | 128² | `LightEmission` 1, `Size` de 0,9 à 0, `Lifetime` de 0,25 à 0,4 |
+| `aim_ring.png` | 512² | Part plate de 2 r × 2 r ; `SurfaceGui` en `FixedSize` 512 sur Top et Bottom ; `LightInfluence` 0 ; pulsation entre 0,05 et 0,35 |
+| `missile_reticle.png` | 512² | `BillboardGui` de 2,2 r studs, `LightInfluence` 0 ; clignote d'une fois par 0,45 s à une fois par 0,06 s |
+| `shockwave_ring.png` | 512² | Part plate en `FixedSize` 512, de 0,3 r à 2 r en 0,35 s, `ImageTransparency` de 0,05 à 1 |
+| `missile_flame.png` | 256 × 64 | `Beam` en `Stretch` de la tuyère vers l'arrière (2,2 studs), `Width0` 0,75 → `Width1` 0,25, `FaceCamera`, `LightEmission` 1 |
 
-### Mini-jeu (C6)
-- **Look** : anneau épais et net dessiné en pastilles rondes qui se chevauchent (bords lisses, angles exacts, pas de cadres tournés), zone verte avec bande « parfaite », pointeur avec halo et traînée.
-- **Raté** : tremblement en **oscillation amortie** (7°, 9 Hz, 0,3 s), puis **changement de sens**, flash rouge de l'anneau, petit recul (ressort), « −2 », secousse lissée, nouvelle zone devant le pointeur.
-- **Réussite** : couleurs vert-jaune-cyan qui tournent sur l'anneau, rebond (ressort sous-amorti), onde de choc, étincelles, « ESCAPED! » animé.
-- **La bande « parfaite »** est uniquement visuelle : le protocole réseau ne change pas.
+Toutes les textures sont en RGBA à alpha droit, en puissances de 2, à graines fixes. Rouge de visée en brouillard réaliste ; tout le reste en style toon avec contours.
 
-## 4. Ce qui n'a pas pu être fait ou vérifié
+---
 
-1. **Aucun test dans Roblox Studio.** Il n'y a pas d'accès à Studio, et je n'ai pas eu le droit d'exécuter un analyseur Luau téléchargé. À vérifier en jouant : tout ce qui est listé à la fin de `luau/MOVEMENT_DESIGN.md`.
-2. **Les valeurs de nage** sont des valeurs de départ, calibrées par simulation mais pas en jouant.
-3. **Importeur** : les tables suivent le format de `spawn/assets.json`, mais l'importeur de la session locale (`AssetPackImporter`) n'a pas été lancé dessus. Si les matériaux `Wood`, `Metal` ou `ForceField` n'y étaient pas encore gérés, il faut les ajouter.
-4. **Mantaflow non utilisé** pour le brouillard : une simulation ne boucle pas proprement. J'ai pris des volumes Cycles en bruit 4D, la solution de repli prévue par le brief.
-5. **Le mur de zone animé** demande un `SurfaceGui` qui avance `ImageRectOffset`, parce qu'un objet `Texture` ne sait pas afficher une case de planche (voir `fx/README.md`).
-6. **Hors de mon périmètre (session locale)** : les barrières invisibles, le recul côté serveur (une suggestion est dans `ConfigPatch.md`), les power-ups, l'onglet Options, le flash rouge du poisson touché, l'intégration de la vignette et de la distorsion, le choix du mode de déplacement dans le panneau admin, l'intégration et la rotation des cartes, l'eau en terrain.
+## 4. Modules Luau : contrats et dépendances
 
-**Écarts assumés par rapport au brief :**
-- **Bateaux** : leur cap pointe vers le centre, donc le pêcheur, à l'arrière, regarde vers la proue par-dessus la cabine. C'est pour ça que sa plateforme est surélevée.
-- **Pods de l'aquarium** : ils regardent le centre exact du bac, donc en biais sur les côtés.
-- **`ClientState` et `FishAnimator`** sont aussi modifiés, alors que le brief ne demandait que `FishController` : c'était nécessaire pour la secousse lissée et la synchronisation de la queue.
+**Clés `FxAssets` ajoutées** (à remplir après téléversement) :
+- `AimBeamFlipbook`, `AimRing`, `MissileReticle` ;
+- `ExplosionFlipbook`, `ShockwaveRing`, `SmokePuff` ;
+- `MissileFlame`, `Bubble`, `ShardSpark`.
+
+Tant qu'une clé vaut `rbxassetid://0`, le module dessine une forme simple à la place. Tout se teste donc avant le téléversement.
+
+### `WeaponFx.handle(kind, ...)`
+
+Dépendances : `FxAssets`, `ClientState`, `Config` ; facultatives : `WeaponModels`, `Bubbles`.
+
+| Type d'effet | Arguments | Retour |
+|---|---|---|
+| `HarpoonAim` | `origin`, `bottom`, `radius`, `duration` | `{ destroy() }` |
+| `HarpoonFire` | `from`, `to`, `travelTime`, `key?` | **`{ rope: Beam, harpoon: Model, setTip(pos), destroy() }`** |
+| `HarpoonTip` | `key`, `pos` | le handle. **En plus du contrat** : pilotage par remote, sans garder le handle. |
+| `HarpoonEnd` | `key` | — (en plus du contrat) |
+| `MissileAim` | `center`, `radius`, `duration` | `{ destroy() }` |
+| `MissileFire` | `from`, `target`, `flightTime` | `{ missile, destroy() }` |
+| `Explosion` | `center`, `radius` | — |
+
+Détails :
+- **Formes acceptées** : `handle` accepte aussi la forme habituelle du remote, `(kind, model, a, b, …)`.
+- **`HarpoonAim`** : l'apparition prend 0,15 s.
+- **`MissileFire`** : le nez arrive exactement à `flightTime`.
+- **`Explosion`** : secousse de caméra par le bruit lisse de `ClientState`, sans saut ; voir `luau/README.md` pour la caméra non poisson.
+- **Mode performance** : 2 fois moins de particules, sans deuxième couche.
+
+### `Disintegrate.play(model, impulseDir?)`
+
+Dépendances : `Config`, `FxAssets` (`ShardSpark`), `ClientState`.
+
+- **Préparation** : clone local des blocs visibles (sauf le `Root`), original caché, joints et scripts retirés.
+- **Cascade** sur 0,35 s, de la queue vers la tête ou depuis l'impact. Flash blanc, freinage dans l'eau et légère remontée, gravité hors de l'eau.
+- **Fin** : 2 s éparpillés, puis rétrécissement et fondu en 0,3 s.
+- **Limites** : 80 morceaux au maximum, regroupés au-delà. Ancré, mis à jour à chaque `RenderStepped`, sans collision, `CanQuery` et `CanTouch` désactivés.
+
+### `Bubbles.start() -> stop`, `Bubbles.burst(pos, n)`
+
+Dépendances : `Config`, `FxAssets` (`Bubble`), `ClientState`, et les attributs `Map*` de `FishGame`.
+
+- **Grappes** de 3 à 12 bulles toutes les 1,5 à 4 s, à moins de 120 studs de la caméra.
+- **Forme de l'eau** : `Plane` (avec le test d'arène de `MapService`) ou `Sphere` (de la sortie de la boule jusqu'en haut).
+- **Fond** : raycast qui ignore le tag `Fish`.
+- **Budget** : 60 bulles au maximum, 20 en mode performance.
+
+### `VoteUi.client.luau`
+
+Contrat du brief :
+- **Attributs** : `VoteOpen`, `VoteEndsAt`, `VotesBattleRoyale`, `VotesSurvival`, `BattleRoyaleLocked`, `NextMode` ;
+- **Remote** : `Remotes.Vote:FireServer("BattleRoyale" | "Survival")`.
+
+Textes en anglais exactement comme demandé. Dépendance : `ClientState.setUiOpen`. Le remote est attendu avec `FindFirstChild` au moment du vote : il peut être créé plus tard.
+
+### `WeaponModels.build(name, anchored?)`
+
+Construit `HarpoonGun`, `Harpoon`, `Bazooka` ou `Missile`.
+- **Racine** : une part `Root` invisible, à l'origine du modèle.
+- **Points d'ancrage** : en `Attachment` sur `Root`.
+- **Groupes** : chaque groupe est un `Model` enfant (`gun.Harpoon`, `bazooka.Missile`).
+- **`anchored == false`** : les parts sont soudées à `Root`, prêtes à être soudées à une main.
+
+Aucune dépendance.
+
+---
 
 ## 5. Ordre d'intégration conseillé (session locale)
-1. Mettre à jour `Config` (`luau/ConfigPatch.md`), puis remplacer `ClientState`, `FishAnimator`, `FishController` et `CatchMinigame`.
-2. Tester la nage dans l'étang actuel, régler avec `MOVEMENT_DESIGN.md`, puis appliquer les patchs serveur conseillés (§ 6 de `ConfigPatch.md`).
-3. Ajouter au panneau admin le choix du mode de déplacement (attribut joueur `MoveMode`).
-4. Téléverser les textures `fx/` et brancher les effets.
-5. Importer les tables `maps/` et `models/`, cloner les pods et les bateaux aux spots, remplir l'eau en terrain, poser les attributs `MapWater*` à chaque rotation de carte (obligatoire pour la carte Ballon).
+
+1. **Textures.** Téléverser les 9 PNG de `fx/` listés plus haut, puis remplacer `FishGame.FxAssets` par `luau/FxAssets.luau` en y mettant les ids. Facultatif : on peut aussi commencer sans, les formes de secours s'affichent.
+2. **Modules.** Copier `WeaponModels`, `WeaponFx`, `Bubbles` et `Disintegrate` dans `ReplicatedStorage.FishGame`. Brancher les types d'effet d'armes dans le gestionnaire de `Remotes.Effect` (`Effects.client.luau`, extrait dans `luau/README.md`). **Test** : depuis le client, appeler `WeaponFx.handle` avec des positions de l'Océan.
+3. **Pêcheurs à harpon et à bazooka**, côté serveur (logique du brief § 3).
+   - Armes : `WeaponModels.build("HarpoonGun", false)` soudée à `RightHand`, au niveau de `RightGripAttachment`. Ajuster `C1` si le canon ne suit pas le bras.
+   - Effets : `HarpoonAim` → `HarpoonFire` (avec `key` = id du pêcheur) → `HarpoonTip` à chaque cran de rétraction → `HarpoonEnd`. Puis `MissileAim` → `MissileFire` → `Explosion` à l'arrivée.
+4. **Élimination.** Le serveur envoie l'effet de mort **avant** de détruire le poisson (environ 0,2 s, ou poisson caché puis détruit). Le client appelle `Disintegrate.play(model, direction)`.
+5. **Bulles.** `Bubbles.start()` une fois, par exemple dans `PondAmbience`.
+6. **Vote.** Mettre `VoteUi.client.luau` dans `StarterPlayerScripts`, puis écrire le serveur du vote : attributs et `Remotes.Vote`. Publier `NextMode` **avant** de passer `VoteOpen` à `false`.
+7. **Décor de l'Océan.**
+   - Importer `megalodon_fossil` et `corals` avec `AssetPackImporter`, comme les cartes du premier brief.
+   - Placer le fossile en `FossilSpot` (repère de l'Océan : ajouter le décalage de la carte, y = −46 = le fond).
+   - Cloner `Coral<variant>` à chaque `CoralSpot` avec `ScaleTo(scale)`.
+   - Faire pousser les algues animées aux `SeaweedSpots` (`height`).
+8. **Tests en jeu** : voir la section 6.
+
+---
+
+## 6. Ce qui n'a pas pu être fait ou vérifié
+
+**Rien n'a tourné dans Roblox Studio** : cette session n'y a pas accès. Les modules sont relus à la main et passent un vérificateur Luau maison (blocs, parenthèses, variables non déclarées), qui n'est pas un vrai analyseur de types. Points à regarder en jeu :
+
+- **Rendu.** Plusieurs choix ne se jugent qu'en jeu :
+  - **Tube de la colonne** en matériau `ForceField` : rendu à juger dans Studio. Si besoin, passer à `Neon` avec transparence 0,8 (constante `AIM.shellTransparency` et matériau dans `harpoonAim`).
+  - **Flamme du missile** : on suppose que l'axe X de la texture suit le `Beam` (de l'attachment 0 vers le 1). Si la flamme apparaît tournée de 90°, faire pivoter `missile_flame.png`.
+  - **Bulles** : `BillboardGui` attachés à des `Attachment`, la méthode documentée.
+  - **Colonne de visée** : la planche est vérifiée numériquement (couture et boucle), mais pas l'empilement dans le `SurfaceGui`.
+- **Code.**
+  - **Soudure des armes** à la main : `C0` et `C1` sont à ajuster à l'œil.
+  - **`MapService`** : si les cartes sont toutes rapprochées au même endroit, il faut garder alignés le test d'arène de `Bubbles` (`MAP_MODELS`, `ArenaMin`/`ArenaMax`, `PondRadius`) et celui du serveur.
+  - **Emoji de `VoteUi`** (🐟👑💀🔒) : ils dépendent de la police emoji de la plateforme, comme ceux des appâts déjà en jeu.
+- **Décor.**
+  - **Couleur du fond de l'Océan** : elle est inconnue d'ici. Les monticules de sable du fossile (groupe `Sand`) seront peut-être à recolorer ou à supprimer.
+  - **Collisions du fossile** : tester qu'un poisson ne reste pas coincé dans la gueule ouverte. Les côtes et les dents ne collisionnent pas.
+  - **Algues** : elles restent à générer en local. Les aperçus n'en montrent que des tiges provisoires.
+- **Équilibrage** : la durée de vol du missile et la vitesse du harpon sont des paramètres d'appel, laissés au serveur local.
+
+**`deliverables2.zip`** (à la racine) : `REPORT.md`, `luau/` (brief 2), `fx/` (textures, générateurs, aperçus), `maps/ocean_decor/`, les 4 armes de `models/` avec leurs aperçus, `maps/dgf_props.py` et `maps/build_maps.py`.

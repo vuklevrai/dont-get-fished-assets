@@ -501,6 +501,314 @@ def do_ocean(out_dir):
     return spots
 
 
+def place_scaled(model, spots_list, name, scale_key="scale"):
+    """Like place_model, but each spot may carry a uniform scale (corals)."""
+    for k, s in enumerate(spots_list):
+        c = s["cframe"]
+        rot = ((c[3], c[4], c[5]), (c[6], c[7], c[8]), (c[9], c[10], c[11]))
+        f = s.get(scale_key, 1.0)
+        prims = []
+        for p in model.prims:
+            q = dict(p)
+            q["pos"] = M.mul(p["pos"], f)
+            q["size"] = M.mul(p["size"], f)
+            prims.append(q)
+        build_meshes(prims, f"{name}{k}", offset=tuple(c[:3]), rot=rot)
+
+
+def seaweed_fronds(spots_list):
+    """Preview only: three slim, leaning fronds per seaweed spot (the local session grows the real, animated ones)."""
+    ph = M.Asset("SeaweedPreview")
+    for k, s in enumerate(spots_list):
+        x, y, z = s["pos"]
+        h = s.get("height", 20)
+        for j in range(3):
+            a = j * 2.1 + k
+            base = (x + math.cos(a) * 1.2, y, z + math.sin(a) * 1.2)
+            lean = (math.cos(a + 0.6) * 0.12, 1.0, math.sin(a + 0.6) * 0.12)
+            hh = h * (0.7 + 0.15 * j)
+            pts = [M.add(base, M.mul(lean, hh * f)) for f in (0.0, 0.34, 0.67, 1.0)]
+            for i in range(3):
+                pts[i + 1] = M.add(pts[i + 1], (math.sin(i * 1.7 + k) * 0.8, 0.0, math.cos(i * 1.3 + k) * 0.8))
+                ph.beam("Seaweed", pts[i], pts[i + 1], 0.9 - 0.2 * i, 0.35, (46 + 14 * j, 150 + 12 * j, 72), "Smooth")
+    return ph
+
+
+def do_ocean_decor(out_dir):
+    import dgf_props as P
+    fossil = P.build_megalodon()
+    corals = P.build_corals()
+    ocean_spots = json.load(open(os.path.join(out_dir, "maps", "ocean", "spots.json"), encoding="utf-8"))
+    fossil_spot, coral_spots, weed_spots, stats, fossil_world = P.ocean_decor_spots(fossil, corals, ocean_spots["PlayerSpawnPoints"])
+    checks = P.fossil_checks(fossil)
+    folder = os.path.join(out_dir, "maps", "ocean_decor")
+    table = M.Asset("Corals")
+    for k, c in enumerate(corals):
+        for p in c.prims:
+            q = dict(p)
+            q["asset"] = f"Coral{k + 1}"
+            table.prims.append(q)
+    if MODE in ("export", "all"):
+        write_table(fossil.prims, folder, "megalodon_fossil")
+        write_table(table.prims, folder, "corals")
+        spots = {
+            "v": 1,
+            "map": "Ocean",
+            "frame": "the Ocean map's own frame, as maps/ocean/spots.json; the bed is the top of the floor slab, y = -46",
+            "FossilSpot": fossil_spot,
+            "CoralVariants": {str(k + 1): f"Coral{k + 1}: {P.CORAL_BUILDERS[k].__doc__.split(':')[0].strip()}" for k in range(6)},
+            "CoralSpots": coral_spots,
+            "SeaweedSpots": weed_spots,
+            "stats": stats,
+            "fossil_checks": checks,
+            "primitives": {"MegalodonFossil": len(fossil.prims), **{f"Coral{k + 1}": len(c.prims) for k, c in enumerate(corals)}},
+        }
+        write_spots(spots, folder)
+    if MODE in ("render", "all"):
+        prev = os.path.join(folder, "previews")
+        os.makedirs(prev, exist_ok=True)
+        # 1) the fossil alone, two views
+        setup_scene(sky=(0.36, 0.6, 0.85), res=(1400, 800), samples=48)
+        build_meshes(fossil.prims, "Fossil")
+        floor = M.Asset("Floor")
+        floor.box("Floor", (-70, -2, -70), (70, 0, 70), (214, 196, 150), "Stud")
+        build_meshes(floor.prims, "Floor")
+        render(os.path.join(prev, "megalodon_fossil_preview.png"), camera("f1", (62, 40, -66), (0, 9, -4), 30))
+        render(os.path.join(prev, "megalodon_fossil_preview_side.png"), camera("f2", (-96, 22, 18), (0, 10, 2), 30))
+        # 2) the six corals in a row, numbered left to right as their variant
+        setup_scene(sky=(0.36, 0.6, 0.85), res=(1600, 600), samples=48)
+        for k, c in enumerate(corals):
+            # variant 1 on the left of the picture (the camera looks along +Z, so screen left is +X)
+            build_meshes(c.prims, f"Coral{k}", offset=(50 - k * 20, 0, 0))
+        floor = M.Asset("Floor")
+        floor.box("Floor", (-75, -2, -20), (75, 0, 20), (214, 196, 150), "Stud")
+        build_meshes(floor.prims, "Floor")
+        render(os.path.join(prev, "corals_preview.png"), camera("c", (0, 30, -96), (0, 3, 0), 30))
+        # 3) the arena under water with all the decor, boats above
+        weed = seaweed_fronds(weed_spots)
+        fx, fz = fossil_spot["pos"][0], fossil_spot["pos"][2]
+        for tag, eye, target, lens in (("ocean_decor_underwater_preview", (fx - 52, -27, fz + 70), (fx + 2, -36, fz), 24),
+                                       ("ocean_decor_underwater_wide_preview", (-140, -14, 100), (40, -40, -30), 18)):
+            setup_scene(sky=(0.2, 0.55, 0.8), samples=40)
+            build_meshes(fossil_world.prims, "Fossil")
+            place_scaled_list = [(corals[s["variant"] - 1], s) for s in coral_spots]
+            for k, (c, s) in enumerate(place_scaled_list):
+                place_scaled(c, [s], f"C{k}_")
+            build_meshes(weed.prims, "Weed")
+            place_model(M.build_fishing_boat(), ocean_spots["BoatSpots"], "Boat")
+            bed = M.Asset("Bed")
+            bed.box("Bed", (-520, -48, -520), (520, P.OCEAN_BED, 520), (214, 196, 150), "Stud")
+            build_meshes(bed.prims, "Bed")
+            underwater_fog((-520, P.OCEAN_BED, -520), (520, M.WATER_LEVEL, 520), 0.0042)
+            render(os.path.join(prev, tag + ".png"), camera("uw", eye, target, lens))
+        # 4) top view of the layout: arena, fossil, corals, seaweed (no water)
+        setup_scene(res=(1000, 1000), samples=24)
+        build_meshes(fossil_world.prims, "Fossil")
+        for k, s in enumerate(coral_spots):
+            place_scaled(corals[s["variant"] - 1], [s], f"C{k}_")
+        build_meshes(weed.prims, "Weed")
+        bed = M.Asset("Bed")
+        bed.box("Bed", (-520, -48, -520), (520, P.OCEAN_BED, 520), (214, 196, 150), "Stud")
+        hx, hz = P.ARENA_HALF
+        for a, b in (((-hx, -hz), (hx, -hz)), ((hx, -hz), (hx, hz)), ((hx, hz), (-hx, hz)), ((-hx, hz), (-hx, -hz))):
+            bed.prim("Guide", "Block", (max(abs(b[0] - a[0]), 2), 0.4, max(abs(b[1] - a[1]), 2)),
+                     ((a[0] + b[0]) / 2, P.OCEAN_BED + 0.2, (a[1] + b[1]) / 2), M.IDENT, (60, 120, 255), "Neon")
+        for sp in ocean_spots["PlayerSpawnPoints"]:
+            bed.prim("Guide", "Cylinder", (0.4, 6, 6), (sp[0], P.OCEAN_BED + 0.3, sp[2]), M.VERTICAL, (255, 60, 60), "Neon", 0.0, False)
+        build_meshes(bed.prims, "Bed")
+        render(os.path.join(prev, "ocean_decor_top_preview.png"), camera("top", (0, 900, 0.01), (0, 0, 0), ortho=1080))
+    print("ocean decor:", json.dumps(stats), json.dumps(checks))
+    return stats
+
+
+WEAPON_FILES = {"HarpoonGun": "harpoon_gun", "Harpoon": "harpoon", "Bazooka": "bazooka", "Missile": "missile"}
+LUAU_SHAPES = ["Block", "Wedge", "Cylinder", "Ball"]
+LUAU_MATERIALS = {"Smooth": "SmoothPlastic", "Metal": "Metal", "Wood": "Wood", "Neon": "Neon", "Glass": "Glass",
+                  "Stud": "Plastic", "ForceField": "ForceField"}
+
+
+def weapon_models_luau(models, spots, path):
+    """luau/WeaponModels.luau: the four weapon tables embedded in a ModuleScript that builds them in Roblox
+    (same parts as the JSON tables, so the weapons need no import step)."""
+    mats = list(LUAU_MATERIALS)
+    lines = [
+        "-- Weapon models of the harpoon and bazooka fishermen, built from primitives (no mesh, no import step).",
+        "-- GENERATED by maps/build_maps.py (weapons) from maps/dgf_props.py: do not edit by hand, re-run the script.",
+        "--",
+        "-- WeaponModels.build(name, anchored?) -> Model  (name: HarpoonGun | Harpoon | Bazooka | Missile)",
+        "--   * PrimaryPart \"Root\" (invisible) sits on the model's origin: the grip for the guns (where the right hand",
+        "--     closes), the point for the projectiles (harpoon tip, missile nose). Barrels and flights look along -Z,",
+        "--     so model:PivotTo(CFrame.lookAt(from, to)) aims it.",
+        "--   * each table group is a child Model: HarpoonGun.Harpoon is the loaded harpoon, Bazooka.Missile the loaded",
+        "--     missile (hide or destroy them when firing).",
+        "--   * anchors from models/weapons_spots.json are Attachments on Root: HarpoonGun.Root.Muzzle / RopeAttach,",
+        "--     Harpoon.Root.RopeAttach, Bazooka.Root.Muzzle / Backblast, Missile.Root.Exhaust (looks out of the nozzle).",
+        "--   * anchored ~= false (default): every part anchored (client effects moved with PivotTo). anchored == false:",
+        "--     parts welded to Root, massless, ready to be welded to a hand.",
+        "--   No part collides, touches or is hit by raycasts.",
+        "local WeaponModels = {}",
+        "",
+        "local SHAPES = { " + ", ".join(f'"{s}"' for s in LUAU_SHAPES) + " }",
+        "local MATERIALS = { " + ", ".join(f"Enum.Material.{LUAU_MATERIALS[m]}" for m in mats) + " }",
+        "",
+        "-- per part: group, shape, material, r, g, b, size x y z, position x y z, quaternion x y z w, transparency",
+        "local MODELS = {",
+    ]
+
+    def num(v, digits):
+        s = f"{v:.{digits}f}".rstrip("0").rstrip(".")
+        return "0" if s in ("-0", "") else s
+
+    for name, model in models.items():
+        groups = []
+        for p in model.prims:
+            if p["group"] not in groups:
+                groups.append(p["group"])
+        lines.append(f"\t{name} = {{")
+        lines.append("\t\tgroups = { " + ", ".join(f'"{g}"' for g in groups) + " },")
+        anchors = []
+        for key, sp in spots[name].items():
+            c = sp["cframe"]
+            anchors.append(f"{key} = CFrame.new(" + ", ".join(num(v, 4) for v in c) + ")")
+        lines.append("\t\tanchors = { " + ", ".join(anchors) + " },")
+        lines.append("\t\tparts = {")
+        for p in model.prims:
+            q = M.quat_from_rot(p["rot"])
+            row = [groups.index(p["group"]) + 1, LUAU_SHAPES.index(p["shape"]) + 1, mats.index(p["mat"]) + 1,
+                   *p["color"]]
+            vals = [str(v) for v in row] + [num(v, 3) for v in p["size"]] + [num(v, 3) for v in p["pos"]]
+            vals += [num(v, 5) for v in q] + [num(p["transparency"], 2)]
+            lines.append("\t\t\t{ " + ", ".join(vals) + " },")
+        lines.append("\t\t},")
+        lines.append("\t},")
+    lines += [
+        "}",
+        "",
+        "function WeaponModels.build(name: string, anchored: boolean?): Model",
+        "\tlocal def = MODELS[name]",
+        "\tassert(def, \"unknown weapon model \" .. tostring(name))",
+        "\tlocal fixed = anchored ~= false",
+        "\tlocal model = Instance.new(\"Model\")",
+        "\tmodel.Name = name",
+        "\tlocal root = Instance.new(\"Part\")",
+        "\troot.Name = \"Root\"",
+        "\troot.Size = Vector3.new(0.2, 0.2, 0.2)",
+        "\troot.Transparency = 1",
+        "\troot.CanCollide = false",
+        "\troot.CanQuery = false",
+        "\troot.CanTouch = false",
+        "\troot.Massless = true",
+        "\troot.Anchored = fixed",
+        "\troot.CFrame = CFrame.identity",
+        "\troot.Parent = model",
+        "\tmodel.PrimaryPart = root",
+        "\tfor key, cf in def.anchors do",
+        "\t\tlocal att = Instance.new(\"Attachment\")",
+        "\t\tatt.Name = key",
+        "\t\tatt.CFrame = cf",
+        "\t\tatt.Parent = root",
+        "\tend",
+        "\tlocal holders = {}",
+        "\tfor i, group in def.groups do",
+        "\t\tlocal holder = Instance.new(\"Model\")",
+        "\t\tholder.Name = group",
+        "\t\tholder.Parent = model",
+        "\t\tholders[i] = holder",
+        "\tend",
+        "\tfor _, row in def.parts do",
+        "\t\tlocal shape = SHAPES[row[2]]",
+        "\t\tlocal part = if shape == \"Wedge\" then Instance.new(\"WedgePart\") else Instance.new(\"Part\")",
+        "\t\tif shape == \"Cylinder\" then",
+        "\t\t\tpart.Shape = Enum.PartType.Cylinder",
+        "\t\telseif shape == \"Ball\" then",
+        "\t\t\tpart.Shape = Enum.PartType.Ball",
+        "\t\tend",
+        "\t\tpart.Material = MATERIALS[row[3]]",
+        "\t\tpart.Color = Color3.fromRGB(row[4], row[5], row[6])",
+        "\t\tpart.Size = Vector3.new(row[7], row[8], row[9])",
+        "\t\tpart.CFrame = CFrame.new(row[10], row[11], row[12], row[13], row[14], row[15], row[16])",
+        "\t\tpart.Transparency = row[17]",
+        "\t\tpart.TopSurface = Enum.SurfaceType.Smooth",
+        "\t\tpart.BottomSurface = Enum.SurfaceType.Smooth",
+        "\t\tpart.CanCollide = false",
+        "\t\tpart.CanQuery = false",
+        "\t\tpart.CanTouch = false",
+        "\t\tpart.Massless = true",
+        "\t\tpart.Anchored = fixed",
+        "\t\tpart.Parent = holders[row[1]]",
+        "\t\tif not fixed then",
+        "\t\t\tlocal weld = Instance.new(\"WeldConstraint\")",
+        "\t\t\tweld.Part0 = root",
+        "\t\t\tweld.Part1 = part",
+        "\t\t\tweld.Parent = part",
+        "\t\tend",
+        "\tend",
+        "\treturn model",
+        "end",
+        "",
+        "-- anchor CFrames in the model's own frame, e.g. WeaponModels.anchor(\"Missile\", \"Exhaust\")",
+        "function WeaponModels.anchor(name: string, key: string): CFrame",
+        "\tlocal def = MODELS[name]",
+        "\treturn def and def.anchors[key] or CFrame.identity",
+        "end",
+        "",
+        "return WeaponModels",
+        "",
+    ]
+    with open(path, "w", encoding="utf-8") as f:
+        f.write("\n".join(lines))
+    print("wrote", path)
+
+
+def scale_dummy():
+    """A plain blocky R15-sized figure (5.2 studs) for scale in the weapon previews."""
+    d = M.Asset("Dummy")
+    grey, dark = (168, 172, 180), (120, 124, 134)
+    d.box("Dummy", (-0.95, 0.0, -0.45), (-0.05, 2.0, 0.45), dark, "Smooth")
+    d.box("Dummy", (0.05, 0.0, -0.45), (0.95, 2.0, 0.45), dark, "Smooth")
+    d.box("Dummy", (-1.0, 2.0, -0.5), (1.0, 4.0, 0.5), grey, "Smooth")
+    d.box("Dummy", (-2.0, 2.1, -0.45), (-1.05, 3.95, 0.45), grey, "Smooth")
+    d.box("Dummy", (1.05, 2.1, -0.45), (2.0, 3.95, 0.45), grey, "Smooth")
+    d.prim("Dummy", "Ball", (1.25, 1.25, 1.25), (0.0, 4.65, 0.0), M.IDENT, grey, "Smooth")
+    return d
+
+
+def do_weapons(out_dir):
+    import dgf_props as P
+    models, spots = P.build_weapons()
+    folder = os.path.join(out_dir, "models")
+    if MODE in ("export", "all"):
+        for name, model in models.items():
+            write_table(model.prims, folder, WEAPON_FILES[name])
+        spots["primitives"] = {k: len(m.prims) for k, m in models.items()}
+        with open(os.path.join(folder, "weapons_spots.json"), "w", encoding="utf-8") as f:
+            json.dump(spots, f, indent=1)
+        print("wrote", os.path.join(folder, "weapons_spots.json"))
+        weapon_models_luau(models, spots, os.path.join(out_dir, "luau", "WeaponModels.luau"))
+    if MODE in ("render", "all"):
+        prev = os.path.join(folder, "previews")
+        os.makedirs(prev, exist_ok=True)
+        views = {"HarpoonGun": ((6.5, 3.2, -6.0), (0.0, 0.6, -2.3), 30), "Harpoon": ((4.6, 2.6, -1.0), (0.0, 0.0, 3.6), 30),
+                 "Bazooka": ((6.2, 3.2, -5.4), (0.0, 0.8, -0.2), 30), "Missile": ((3.0, 1.6, -1.6), (0.0, 0.0, 1.9), 34)}
+        for name, model in models.items():
+            setup_scene(sky=(0.62, 0.74, 0.9), res=(1000, 700), samples=48)
+            build_meshes(model.prims, name)
+            eye, target, lens = views[name]
+            render(os.path.join(prev, WEAPON_FILES[name] + "_preview.png"), camera("c", eye, target, lens))
+        # the four side by side with a 5.2-stud figure for scale
+        setup_scene(sky=(0.62, 0.74, 0.9), res=(1400, 700), samples=48)
+        build_meshes(scale_dummy().prims, "Dummy", offset=(-4.6, 0.0, 0.0))
+        # stacked, every barrel turned towards screen left (+X), origins on x = 1
+        place = {"HarpoonGun": (1.0, 5.4), "Bazooka": (1.0, 2.9), "Harpoon": (1.6, 1.3), "Missile": (1.6, 0.45)}
+        for name, (x, y) in place.items():
+            build_meshes(models[name].prims, name + "L", offset=(x, y, 0.0), rot=M.rot_y(-math.pi / 2))
+        floor = M.Asset("Floor")
+        floor.box("Floor", (-14, -0.4, -6), (14, 0, 6), (210, 214, 222), "Smooth")
+        build_meshes(floor.prims, "Floor")
+        render(os.path.join(prev, "weapons_lineup_preview.png"), camera("c", (0.6, 3.6, -15.5), (0.6, 3.1, 0.0), 32))
+    return models
+
+
 def main():
     out = REPO
     if "models" in WHAT:
@@ -511,6 +819,10 @@ def main():
         do_ballon(out)
     if "ocean" in WHAT:
         do_ocean(out)
+    if "ocean_decor" in WHAT:
+        do_ocean_decor(out)
+    if "weapons" in WHAT:
+        do_weapons(out)
 
 
 main()
