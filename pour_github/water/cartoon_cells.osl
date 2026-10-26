@@ -1,0 +1,66 @@
+// Seamless, looping Voronoi cells for a 1x1 tile.
+// Sites are jittered per cell and orbit a little around their spot: Time 0 -> 1 is one loop.
+// EdgeDist is the distance (in cell units) to the nearest cell border; CellRand is per cell.
+
+#define SITE(cid) site_offset(cid, Jitter, Orbit, Time)
+
+vector site_offset(point cid, float jitter, float orbit, float time)
+{
+    vector h = noise("cell", cid);
+    float a = M_2PI * (time + h[2]);
+    return vector(0.5 + jitter * (h[0] - 0.5) + orbit * cos(a),
+                  0.5 + jitter * (h[1] - 0.5) + orbit * sin(a), 0.0);
+}
+
+point wrap_cell(point c, float n)
+{
+    return point(mod(c[0], n), mod(c[1], n), 0.0);
+}
+
+shader cartoon_cells(
+    point Coord = point(0.0, 0.0, 0.0),
+    float Cells = 7.0,
+    float Jitter = 0.7,
+    float Orbit = 0.1,
+    float Time = 0.0,
+    output float EdgeDist = 0.0,
+    output float CellRand = 0.0)
+{
+    float n = floor(Cells + 0.5);
+    point p = point(Coord[0] * n, Coord[1] * n, 0.0);
+    point ip = point(floor(p[0]), floor(p[1]), 0.0);
+    vector fp = p - ip;
+
+    // nearest site
+    float best = 1e9;
+    vector mr = vector(0.0);
+    vector mg = vector(0.0);
+    for (int j = -1; j <= 1; j++) {
+        for (int i = -1; i <= 1; i++) {
+            vector g = vector(i, j, 0.0);
+            point cid = wrap_cell(ip + g, n);
+            vector r = g + SITE(cid) - fp;
+            float d = dot(r, r);
+            if (d < best) {
+                best = d;
+                mr = r;
+                mg = g;
+                CellRand = noise("cell", cid + point(17.0, 31.0, 5.0));
+            }
+        }
+    }
+
+    // distance to the closest border (bisector of the nearest site and each neighbour)
+    best = 8.0;
+    for (int j = -2; j <= 2; j++) {
+        for (int i = -2; i <= 2; i++) {
+            vector g = mg + vector(i, j, 0.0);
+            point cid = wrap_cell(ip + g, n);
+            vector r = g + SITE(cid) - fp;
+            vector dr = r - mr;
+            if (dot(dr, dr) > 1e-6)
+                best = min(best, dot(0.5 * (mr + r), normalize(dr)));
+        }
+    }
+    EdgeDist = best;
+}
