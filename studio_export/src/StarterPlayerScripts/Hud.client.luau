@@ -154,6 +154,7 @@ end
 local chips = {
 	speed = effectChip("", Color3.fromRGB(40, 170, 230)),
 	invisible = effectChip("", Color3.fromRGB(150, 90, 230)),
+	titan = effectChip("", Color3.fromRGB(235, 110, 30)),
 	stunned = effectChip("STUNNED", Color3.fromRGB(230, 80, 60)),
 }
 
@@ -284,5 +285,8 @@ RunService.Heartbeat:Connect(function()
 	local invLeft = (character:GetAttribute("InvisibleUntil") or 0) - now
 	chips.invisible.Visible = character:GetAttribute("Invisible") == true and invLeft > 0
 	chips.invisible.Text = "INVISIBLE " .. math.ceil(invLeft) .. "s"
+	local titanLeft = (character:GetAttribute("TitanUntil") or 0) - now
+	chips.titan.Visible = titanLeft > 0
+	chips.titan.Text = "\u{1F4AA} TITAN " .. math.ceil(titanLeft) .. "s"
 	chips.stunned.Visible = (character:GetAttribute("StunnedUntil") or 0) > now
 end)

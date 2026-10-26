@@ -1,5 +1,6 @@
--- Main menu (M, or the button on the left): fish inventory (3D preview, skins, stats, ability, show off)
--- and the shop (empty for now).
+-- Main menu (M, or the button on the left): fish inventory (3D preview, skins, stats, ability, show off),
+-- the shop (empty for now) and the options (performance mode).
+local Lighting = game:GetService("Lighting")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
@@ -85,7 +86,8 @@ local keyHint = make("TextLabel", menuButton, { AnchorPoint = Vector2.new(0.5, 0
 textStroke(keyHint, Color3.fromRGB(10, 20, 40), 2)
 
 -- ------------------------------------------------------------------------------------------ panel
-local panel = make("Frame", gui, { AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5), Size = UDim2.fromOffset(760, 470),
+local PANEL_W, PANEL_H = 900, 470
+local panel = make("Frame", gui, { AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5), Size = UDim2.fromOffset(PANEL_W, PANEL_H),
 	BackgroundColor3 = NAVY, Visible = false })
 corner(panel, 20)
 stroke(panel, GOLD, 4)
@@ -106,6 +108,7 @@ local function addTab(name, text, x)
 end
 local fishTab, fishPage = addTab("Fish", "\u{1F41F} FISH", 210)
 local shopTab, shopPage = addTab("Shop", "\u{1F6D2} SHOP", 372)
+local optionsTab, optionsPage = addTab("Options", "\u{2699} OPTIONS", 534)
 
 -- ------------------------------------------------------------------------------------------ fish page
 local list = make("ScrollingFrame", fishPage, { Size = UDim2.new(0, 190, 1, 0), BackgroundColor3 = NAVY_DARK, ScrollBarThickness = 6,
@@ -179,6 +182,64 @@ for _ = 1, 4 do
 	make("TextLabel", card, { AnchorPoint = Vector2.new(0.5, 1), Position = UDim2.new(0.5, 0, 1, -12), Size = UDim2.new(1, -20, 0, 22),
 		BackgroundTransparency = 1, Text = "Soon", Font = Enum.Font.GothamBlack, TextColor3 = Color3.fromRGB(120, 140, 180) })
 end
+
+-- ------------------------------------------------------------------------------------------ options page
+-- Performance mode: still water, no shadows or post effects, fewer particles, and the small decorations
+-- (flowers, tall grass, seaweed sway) dropped on this client to save memory.
+local perfRow = make("Frame", optionsPage, { Size = UDim2.new(1, 0, 0, 104), BackgroundColor3 = NAVY_DARK })
+corner(perfRow, 14)
+make("TextLabel", perfRow, { Position = UDim2.fromOffset(18, 12), Size = UDim2.new(1, -230, 0, 30), BackgroundTransparency = 1,
+	Text = "Performance mode", TextXAlignment = Enum.TextXAlignment.Left, TextColor3 = GOLD })
+make("TextLabel", perfRow, { Position = UDim2.fromOffset(18, 48), Size = UDim2.new(1, -230, 0, 48), BackgroundTransparency = 1,
+	TextScaled = false, TextSize = 15, TextWrapped = true, Font = Enum.Font.GothamMedium, TextXAlignment = Enum.TextXAlignment.Left,
+	TextYAlignment = Enum.TextYAlignment.Top, TextColor3 = Color3.fromRGB(220, 232, 255),
+	Text = "Lighter graphics for small computers: still water, no shadows, fewer particles and decorations (uses less memory)." })
+local perfButton = button(perfRow, "OFF", Color3.fromRGB(110, 90, 160), { AnchorPoint = Vector2.new(1, 0.5), Position = UDim2.new(1, -18, 0.5, 0),
+	Size = UDim2.fromOffset(170, 52) })
+
+local hiddenDecor: { [Instance]: Instance } = {} -- decoration -> its parent, while performance mode hides it
+local savedLighting = nil
+local function applyPerformance(on: boolean)
+	ClientState.performance = on
+	ClientState.changed:Fire()
+	perfButton.Text = on and "ON" or "OFF"
+	perfButton.BackgroundColor3 = on and Color3.fromRGB(70, 190, 90) or Color3.fromRGB(110, 90, 160)
+	if on then
+		savedLighting = { shadows = Lighting.GlobalShadows, effects = {} }
+		Lighting.GlobalShadows = false
+		for _, e in Lighting:GetChildren() do
+			if e:IsA("PostEffect") and e.Name ~= "DashBlur" and e.Enabled then
+				savedLighting.effects[e] = true
+				e.Enabled = false
+			end
+		end
+		for _, name in { "Flowers" } do
+			for _, map in workspace:GetChildren() do
+				local decor = map:FindFirstChild("Decor")
+				local f = decor and decor:FindFirstChild(name)
+				if f then
+					hiddenDecor[f] = f.Parent
+					f.Parent = nil
+				end
+			end
+		end
+	else
+		if savedLighting then
+			Lighting.GlobalShadows = savedLighting.shadows
+			for e in savedLighting.effects do
+				e.Enabled = true
+			end
+			savedLighting = nil
+		end
+		for f, parent in hiddenDecor do
+			f.Parent = parent
+		end
+		table.clear(hiddenDecor)
+	end
+end
+perfButton.Activated:Connect(function()
+	applyPerformance(not ClientState.performance)
+end)
 
 -- ------------------------------------------------------------------------------------------ preview
 local viewed = player:GetAttribute("SelectedFish") or Config.DEFAULT_SPECIES
@@ -302,8 +363,8 @@ local function setOpen(value: boolean)
 		viewed = player:GetAttribute("SelectedFish") or Config.DEFAULT_SPECIES
 		refreshFish()
 		refreshShowOff()
-		panel.Size = UDim2.fromOffset(700, 430)
-		TweenService:Create(panel, TweenInfo.new(0.18, Enum.EasingStyle.Back), { Size = UDim2.fromOffset(760, 470) }):Play()
+		panel.Size = UDim2.fromOffset(PANEL_W - 60, PANEL_H - 40)
+		TweenService:Create(panel, TweenInfo.new(0.18, Enum.EasingStyle.Back), { Size = UDim2.fromOffset(PANEL_W, PANEL_H) }):Play()
 		showPage(current)
 	else
 		Remotes.SetHolding:FireServer(false)
@@ -321,6 +382,9 @@ fishTab.Activated:Connect(function()
 end)
 shopTab.Activated:Connect(function()
 	showPage("Shop")
+end)
+optionsTab.Activated:Connect(function()
+	showPage("Options")
 end)
 selectButton.Activated:Connect(function()
 	Remotes.SelectFish:FireServer(viewed)

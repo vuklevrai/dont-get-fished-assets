@@ -1,11 +1,14 @@
 -- Plays the fish animations exported from Blender (FishAnims): "nage" while swimming (faster with speed),
 -- "repos" when idle, "attaque" when the fish dashes, and a frantic swim while caught on a hook.
+-- The local player's fish follows FishController's swim intensity and stroke phase (ClientState), so the tail
+-- beats with the speed surges; every other fish is driven by its speed.
 local CollectionService = game:GetService("CollectionService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 
 local FishGame = ReplicatedStorage:WaitForChild("FishGame")
 local Config = require(FishGame:WaitForChild("Config"))
+local ClientState = require(FishGame:WaitForChild("ClientState"))
 local FishSpecies = require(FishGame:WaitForChild("FishSpecies"))
 local animFolder = FishGame:WaitForChild("FishAnims")
 
@@ -86,12 +89,19 @@ RunService.PreSimulation:Connect(function(dt)
 		end
 		local speed = root.AssemblyLinearVelocity.Magnitude
 		local k = math.clamp(speed / (Config.SWIM_SPEED * 1.4), 0, 1)
-		if model:GetAttribute("PreviewSwim") then
+		local mine = ClientState.swimModel == model
+		if mine then
+			k = math.clamp(ClientState.swimIntensity, 0, 1.3)
+		elseif model:GetAttribute("PreviewSwim") then
 			-- menu preview: anchored, but swims in place
 			k = 0.55
 		end
 		local caught = model:GetAttribute("Caught")
-		state.swim += dt * (caught and 3.5 or (0.7 + 1.6 * k))
+		if mine and not caught then
+			state.swim = ClientState.swimPhase * anims.anims.nage.length
+		else
+			state.swim += dt * (caught and 3.5 or (0.7 + 1.6 * k))
+		end
 		state.idle += dt
 		local dashStart = model:GetAttribute("DashStart") or 0
 		if dashStart ~= state.lastDash then

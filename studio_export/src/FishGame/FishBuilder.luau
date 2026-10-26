@@ -46,6 +46,8 @@ function FishBuilder.build(species: string, name: string, palette: { [string]: C
 	root.Massless = false
 	-- frictionless so the fish slides along walls instead of sticking to them
 	root.CustomPhysicalProperties = PhysicalProperties.new(1, 0, 0, 100, 1)
+	-- invisible map barriers ("FishBarrier") only stop fish
+	root.CollisionGroup = "Fish"
 	root.Parent = model
 	model.PrimaryPart = root
 

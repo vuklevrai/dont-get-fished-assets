@@ -25,6 +25,7 @@ export type FishInfo = {
 	speedStat: number,
 	speedBoostUntil: number,
 	invisibleUntil: number,
+	titanUntil: number,
 	invulnerableUntil: number,
 	lastAttacker: Player?,
 	lastAttackTime: number,
@@ -75,12 +76,13 @@ end
 
 -- size, speed and the level badge follow the level and the active power-ups
 function FishService.applyStats(info: FishInfo)
-	local size = info.sizeStat + (info.level - 1)
+	local titan = info.titanUntil > now()
+	local size = info.sizeStat + (info.level - 1) + (titan and Config.TITAN_SIZE or 0)
 	local scale = FishStats.factor(size)
 	if math.abs(info.model:GetScale() - scale) > 1e-3 then
 		info.model:ScaleTo(scale)
 	end
-	local base = FishStats.factor(info.speedStat)
+	local base = FishStats.factor(info.speedStat + (titan and Config.TITAN_SPEED or 0))
 	local speed = base * (1 + FishStats.LEVEL_SPEED * (info.level - 1))
 	if info.speedBoostUntil > now() then
 		speed += base * Config.SPEED_BOOST
@@ -92,6 +94,7 @@ function FishService.applyStats(info: FishInfo)
 	m:SetAttribute("Invisible", info.invisibleUntil > now())
 	m:SetAttribute("InvisibleUntil", info.invisibleUntil)
 	m:SetAttribute("SpeedBoostUntil", info.speedBoostUntil)
+	m:SetAttribute("TitanUntil", info.titanUntil)
 	if not info.bot then
 		levelBadge(info)
 	end
@@ -117,6 +120,7 @@ function FishService.create(speciesId: string, opts): (Model, FishInfo)
 		speedStat = opts.speedStat or species.Speed,
 		speedBoostUntil = 0,
 		invisibleUntil = 0,
+		titanUntil = 0,
 		invulnerableUntil = 0,
 		lastAttacker = nil,
 		lastAttackTime = 0,
@@ -211,6 +215,12 @@ function FishService.boostSpeed(info: FishInfo, seconds: number)
 	FishService.applyStats(info)
 end
 
+-- Titan power-up: a huge, fast fish for a while
+function FishService.titan(info: FishInfo, seconds: number)
+	info.titanUntil = now() + seconds
+	FishService.applyStats(info)
+end
+
 -- health regeneration and power-up timeouts
 local acc = 0
 RunService.Heartbeat:Connect(function(dt)
@@ -227,9 +237,13 @@ RunService.Heartbeat:Connect(function(dt)
 			end
 			local invisible = info.invisibleUntil > t
 			if info.model:GetAttribute("Invisible") ~= invisible
-				or (info.speedBoostUntil > 0 and info.speedBoostUntil <= t) then
+				or (info.speedBoostUntil > 0 and info.speedBoostUntil <= t)
+				or (info.titanUntil > 0 and info.titanUntil <= t) then
 				if info.speedBoostUntil <= t then
 					info.speedBoostUntil = 0
+				end
+				if info.titanUntil <= t then
+					info.titanUntil = 0
 				end
 				FishService.applyStats(info)
 			end

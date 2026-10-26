@@ -112,6 +112,17 @@ end
 local gameGrid = section("Game")
 act(gameGrid, "\u{25B6} Start endless test", GREEN, send("StartTest"))
 act(gameGrid, "\u{2693} Back to lobby", BLUE, send("StopTest"))
+-- map of the next round (Auto = rotation); a running test game keeps its map until Back to lobby
+local MAPS = { "Auto", "Pond", "Aquarium", "Ballon", "Ocean" }
+local mapButton = act(gameGrid, "", Color3.fromRGB(40, 140, 120), function() end)
+local function paintMap()
+	mapButton.Text = "\u{1F5FA} Map: " .. (FishGame:GetAttribute("SettingMap") or "Auto")
+end
+mapButton.Activated:Connect(function()
+	local current = table.find(MAPS, FishGame:GetAttribute("SettingMap") or "Auto") or 1
+	Remotes.Admin:FireServer("Setting", "Map", MAPS[current % #MAPS + 1])
+end)
+table.insert(refreshers, paintMap)
 switch(gameGrid, "Hold lobby", function()
 	return FishGame:GetAttribute("SettingHoldLobby") == true
 end, function(on)
@@ -148,6 +159,19 @@ end, function(on)
 	ClientState.changed:Fire()
 end)
 
+-- movement test modes (read only by this client's FishController)
+local MOVE_MODES = { "Classic", "CameraOnly", "ShiftLock" }
+local moveButton = act(meGrid, "", Color3.fromRGB(60, 150, 200), function() end)
+local function paintMoveMode()
+	moveButton.Text = "Move: " .. (player:GetAttribute("MoveMode") or "Classic")
+end
+moveButton.Activated:Connect(function()
+	local current = table.find(MOVE_MODES, player:GetAttribute("MoveMode") or "Classic") or 1
+	player:SetAttribute("MoveMode", MOVE_MODES[current % #MOVE_MODES + 1])
+	paintMoveMode()
+end)
+table.insert(refreshers, paintMoveMode)
+
 -- ------------------------------------------------------------------------------------------ spawning
 local spawnGrid = section("Spawn")
 act(spawnGrid, "\u{1F41F} Enemy fish", Color3.fromRGB(60, 120, 200), send("SpawnEnemy"))
@@ -155,6 +179,7 @@ act(spawnGrid, "\u{1F3A3} Fisherman", Color3.fromRGB(200, 150, 40), send("SpawnF
 act(spawnGrid, "\u{2B50} Bait: Level", Color3.fromRGB(210, 170, 30), send("SpawnPowerUp", "Level"))
 act(spawnGrid, "\u{26A1} Bait: Speed", Color3.fromRGB(40, 170, 210), send("SpawnPowerUp", "Speed"))
 act(spawnGrid, "\u{1F47B} Bait: Invisible", Color3.fromRGB(150, 100, 220), send("SpawnPowerUp", "Invisible"))
+act(spawnGrid, "\u{1F4AA} Bait: Titan", Color3.fromRGB(230, 110, 30), send("SpawnPowerUp", "Titan"))
 act(spawnGrid, "Clear enemies", Color3.fromRGB(120, 60, 60), send("ClearEnemies"))
 act(spawnGrid, "Clear fishermen", Color3.fromRGB(120, 60, 60), send("ClearFishermen"))
 
@@ -194,7 +219,8 @@ local function refreshStatus()
 		timeText = clock((FishGame:GetAttribute("PhaseEnd") or now) - now) .. " left"
 	end
 	local lines = {
-		string.format("%s%s  %s   alive %d", phase, FishGame:GetAttribute("TestMode") and " (test)" or "", timeText, FishGame:GetAttribute("Alive") or 0),
+		string.format("%s%s  %s   alive %d   map %s", phase, FishGame:GetAttribute("TestMode") and " (test)" or "", timeText,
+			FishGame:GetAttribute("Alive") or 0, tostring(FishGame:GetAttribute("MapName") or "-")),
 		string.format("fishermen %d   enemies %d", FishGame:GetAttribute("Fishermen") or 0, FishGame:GetAttribute("Enemies") or 0),
 	}
 	local character = player.Character

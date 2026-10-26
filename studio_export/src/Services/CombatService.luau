@@ -71,6 +71,17 @@ local function stopDash(info)
 	end
 end
 
+-- the lighter fish flies further, like two masses colliding (mass ~ size factor cubed):
+-- base speed between equals, up to twice it against a much heavier fish
+local function knockbackSpeed(victim, other, base: number): number
+	local mv = victim.model:GetScale() ^ 3
+	local mo = other.model:GetScale() ^ 3
+	return base * 2 * mo / (mv + mo)
+end
+
+local BUMP_KNOCKBACK = 28 -- studs/s between two fish of the same size
+local BUMP_STUN = 0.4 -- every bump sends both fish tumbling a little
+
 local function dashHit(attacker, victim)
 	local size = attacker.model:GetAttribute("Size") or 2
 	FishService.damage(victim, FishStats.dashDamage(size), attacker)
@@ -78,7 +89,7 @@ local function dashHit(attacker, victim)
 	if dir.Magnitude < 1 then
 		dir = victim.root.Position - attacker.root.Position
 	end
-	FishService.stun(victim, dir.Unit * Config.DASH_HIT_KNOCKBACK, Config.DASH_HIT_STUN)
+	FishService.stun(victim, dir.Unit * knockbackSpeed(victim, attacker, Config.DASH_HIT_KNOCKBACK), Config.DASH_HIT_STUN)
 	stopDash(attacker)
 	Remotes.Effect:FireAllClients("Hit", victim.model, (attacker.root.Position + victim.root.Position) / 2)
 end
@@ -92,12 +103,16 @@ local function bump(a, b)
 	local dBig, dSmall, stun, knock = FishStats.collision(sa - sb)
 	FishService.damage(big, dBig, small)
 	FishService.damage(small, dSmall, big)
-	if stun > 0 then
-		local away = small.root.Position - big.root.Position
-		if away.Magnitude < 0.01 then
-			away = Vector3.yAxis
-		end
-		FishService.stun(small, away.Unit * knock, stun)
+	-- both fish bounce off each other; the size table's extra knock applies to the small one
+	local away = small.root.Position - big.root.Position
+	if away.Magnitude < 0.01 then
+		away = Vector3.yAxis
+	end
+	away = away.Unit
+	local smallSpeed = math.max(knock, knockbackSpeed(small, big, BUMP_KNOCKBACK))
+	FishService.stun(small, away * smallSpeed, math.max(stun, BUMP_STUN))
+	if sa == sb or stun == 0 then
+		FishService.stun(big, -away * knockbackSpeed(big, small, BUMP_KNOCKBACK), BUMP_STUN)
 	end
 	Remotes.Effect:FireAllClients("Bump", small.model, (a.root.Position + b.root.Position) / 2)
 end

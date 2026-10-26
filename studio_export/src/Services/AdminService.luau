@@ -22,8 +22,10 @@ function AdminService.isAdmin(player: Player): boolean
 	return game.CreatorType == Enum.CreatorType.User and player.UserId == game.CreatorId
 end
 
-local SETTINGS = { Fishermen = "boolean", Enemies = "boolean", PowerUps = "boolean", Difficulty = "string", HoldLobby = "boolean" }
+local SETTINGS = { Fishermen = "boolean", Enemies = "boolean", PowerUps = "boolean", Difficulty = "string", HoldLobby = "boolean",
+	Map = "string" }
 local DIFFICULTIES = { Auto = true, Easy = true, Medium = true, Hard = true }
+local MAPS = { Auto = true, Pond = true, Aquarium = true, Ballon = true, Ocean = true }
 
 local actions = {}
 
@@ -97,6 +99,9 @@ function actions.Setting(_, name, value)
 		return
 	end
 	if name == "Difficulty" and not DIFFICULTIES[value] then
+		return
+	end
+	if name == "Map" and not MAPS[value] then
 		return
 	end
 	RoundService.settings[name] = value

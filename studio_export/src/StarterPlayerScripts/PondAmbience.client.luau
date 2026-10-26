@@ -1,7 +1,10 @@
 -- Seaweed sway, block style: each leaf snaps between half-stud offsets a few times per second
 -- (higher leaves move further), like stop-motion. Client-only; the leaves never collide.
 local CollectionService = game:GetService("CollectionService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Workspace = game:GetService("Workspace")
+
+local ClientState = require(ReplicatedStorage:WaitForChild("FishGame"):WaitForChild("ClientState"))
 
 local STEP = 0.5 -- studs: offsets snap to this grid
 local FRAME = 0.2 -- seconds between poses
@@ -45,6 +48,9 @@ end
 
 while true do
 	task.wait(FRAME)
+	if ClientState.performance then
+		continue -- performance mode: the seaweed stands still
+	end
 	local camera = Workspace.CurrentCamera
 	local eye = camera and camera.CFrame.Position or Vector3.zero
 	local t = os.clock()

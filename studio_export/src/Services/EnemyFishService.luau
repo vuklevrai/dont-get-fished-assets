@@ -11,10 +11,10 @@ local Remotes = FishGame.Remotes
 local FishService = require(script.Parent.FishService)
 local CombatService = require(script.Parent.CombatService)
 local RoundService = require(script.Parent.RoundService)
+local MapService = require(script.Parent.MapService)
 
 local EnemyFishService = {}
 
-local WATER = Config.WATER_LEVEL
 local running = false
 local round = nil
 local folder: Folder? = nil
@@ -84,7 +84,7 @@ local function nearestTarget(pos: Vector3)
 	local t = now()
 	for _, info in FishService.fish do
 		if info.player and FishService.alive(info) and not info.model:GetAttribute("Caught")
-			and info.invisibleUntil <= t and info.root.Position.Y < WATER + 0.5 then
+			and info.invisibleUntil <= t and MapService.depth(round.map, info.root.Position) > -0.5 then
 			local d = (info.root.Position - pos).Magnitude
 			if d < bestDist then
 				best, bestDist = info, d
@@ -129,7 +129,11 @@ local function steer(bot, dt: number)
 		goal = bot.wander
 		speed *= 0.6
 	end
-	goal = Vector3.new(goal.X, math.min(goal.Y, WATER - 2.5), goal.Z)
+	-- stay under the surface (flat or curved)
+	local goalDepth, goalUp = MapService.depth(round.map, goal)
+	if goalDepth < 2.5 then
+		goal -= goalUp * (2.5 - goalDepth)
+	end
 	local dir = goal - pos
 	dir = dir.Magnitude > 0.1 and dir.Unit or root.CFrame.LookVector
 	-- avoid walls and the bed
@@ -149,8 +153,10 @@ local function steer(bot, dt: number)
 	end
 	local wanted = dashing and (bot.dashDir or dir) * Config.DASH_SPEED * (model:GetAttribute("SpeedFactor") or 1) or dir * speed
 	bot.velocity = bot.velocity:Lerp(wanted, 1 - math.exp(-(dashing and 12 or Config.ACCELERATION) * dt))
-	if pos.Y > WATER - 1.5 and bot.velocity.Y > 0 then
-		bot.velocity = Vector3.new(bot.velocity.X, 0, bot.velocity.Z)
+	local depth, up = MapService.depth(round.map, pos)
+	local rising = bot.velocity:Dot(up)
+	if depth < 1.5 and rising > 0 then
+		bot.velocity -= up * rising
 	end
 	velocityC.VectorVelocity = bot.velocity
 	if bot.velocity.Magnitude > 1 then

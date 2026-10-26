@@ -1,5 +1,7 @@
--- Power-ups: baits floating on the surface. Every 5 s there is a 50% chance one appears next to a random
--- hook (or anywhere on the pond when no hook is out). A player fish swimming into it picks it up.
+-- Power-ups: big glowing baits floating just under the surface. Every 5 s there is a 50% chance one
+-- appears next to a random hook (or anywhere in the arena). A player fish swimming into it picks it up.
+-- Untouched, a bait vanishes after 12 s, blinking during its last 3 s (the client draws the blink from
+-- its ExpiresAt attribute).
 local CollectionService = game:GetService("CollectionService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
@@ -10,6 +12,7 @@ local Remotes = FishGame.Remotes
 local FishService = require(script.Parent.FishService)
 local RoundService = require(script.Parent.RoundService)
 local FishermanService = require(script.Parent.FishermanService)
+local MapService = require(script.Parent.MapService)
 
 local PowerUpService = {}
 
@@ -17,8 +20,25 @@ PowerUpService.TYPES = {
 	Level = { Color = Color3.fromRGB(255, 205, 40), Icon = "⭐", Label = "LEVEL UP" },
 	Speed = { Color = Color3.fromRGB(60, 220, 255), Icon = "⚡", Label = "SPEED" },
 	Invisible = { Color = Color3.fromRGB(190, 110, 255), Icon = "👻", Label = "INVISIBLE" },
+	Titan = { Color = Color3.fromRGB(255, 120, 30), Icon = "💪", Label = "TITAN!" },
 }
-local ORDER = { "Level", "Speed", "Invisible" }
+local BAIT_SCALE = 3
+
+-- a random kind, following Config.POWERUP_WEIGHTS (Titan is rare)
+local function randomKind(): string
+	local total = 0
+	for _, w in Config.POWERUP_WEIGHTS do
+		total += w
+	end
+	local roll = math.random() * total
+	for kind, w in Config.POWERUP_WEIGHTS do
+		roll -= w
+		if roll <= 0 then
+			return kind
+		end
+	end
+	return "Speed"
+end
 
 local running = false
 local round = nil
@@ -45,7 +65,7 @@ local function buildBait(kind: string): Model
 	local orb = deco(Instance.new("Part"))
 	orb.Name = "Orb"
 	orb.Shape = Enum.PartType.Ball
-	orb.Size = Vector3.new(3.2, 3.2, 3.2)
+	orb.Size = Vector3.one * 3.2 * BAIT_SCALE
 	orb.Color = def.Color
 	orb.Material = Enum.Material.Neon
 	orb.Transparency = 0.55
@@ -58,19 +78,20 @@ local function buildBait(kind: string): Model
 		local a = i / 4 * math.pi * 1.3 - 0.6
 		local seg = deco(Instance.new("Part"))
 		seg.Name = "Worm"
-		seg.Size = Vector3.new(0.7, 0.7, 0.9)
+		seg.Size = Vector3.new(0.7, 0.7, 0.9) * BAIT_SCALE
 		seg.Color = i % 2 == 0 and pink or Color3.fromRGB(240, 96, 130)
-		seg.CFrame = CFrame.new(math.cos(a) * 0.8, math.sin(i * 1.3) * 0.3, math.sin(a) * 0.8) * CFrame.Angles(0, -a, 0)
+		seg.CFrame = CFrame.new(math.cos(a) * 0.8 * BAIT_SCALE, math.sin(i * 1.3) * 0.3 * BAIT_SCALE, math.sin(a) * 0.8 * BAIT_SCALE)
+			* CFrame.Angles(0, -a, 0)
 		seg.Parent = m
 	end
 	local light = Instance.new("PointLight")
 	light.Color = def.Color
-	light.Range = 12
-	light.Brightness = 2
+	light.Range = 26
+	light.Brightness = 2.5
 	light.Parent = orb
 	local gui = Instance.new("BillboardGui")
-	gui.Size = UDim2.fromOffset(46, 46)
-	gui.StudsOffset = Vector3.new(0, 3.2, 0)
+	gui.Size = UDim2.fromOffset(64, 64)
+	gui.StudsOffset = Vector3.new(0, 3.2 * BAIT_SCALE * 0.75, 0)
 	gui.MaxDistance = 160
 	gui.LightInfluence = 0
 	local icon = Instance.new("TextLabel")
@@ -85,44 +106,36 @@ local function buildBait(kind: string): Model
 	return m
 end
 
-local function pondPoint(): Vector3
+-- where a new bait goes: near a hook in the water (they are a lure), else anywhere in the arena
+local function baitPosition(): Vector3
 	local map = round.map
-	local rx, rz = map:GetAttribute("PondRadiusX") or 100, map:GetAttribute("PondRadiusZ") or 80
-	local a, r = math.random() * math.pi * 2, math.sqrt(math.random()) * 0.8
-	return Vector3.new(math.cos(a) * rx * r, 0, math.sin(a) * rz * r)
-end
-
-local function inPond(p: Vector3): boolean
-	local map = round.map
-	local rx, rz = map:GetAttribute("PondRadiusX") or 100, map:GetAttribute("PondRadiusZ") or 80
-	return (p.X / rx) ^ 2 + (p.Z / rz) ^ 2 < 0.8
+	local hooksOut = FishermanService.hookPositions()
+	if #hooksOut > 0 and map:GetAttribute("WaterShape") ~= "Sphere" then
+		for _ = 1, 10 do
+			local h = hooksOut[math.random(1, #hooksOut)]
+			local a, d = math.random() * math.pi * 2, 22 + math.random() * 14
+			local p = h + Vector3.new(math.cos(a) * d, 0, math.sin(a) * d)
+			if MapService.inArena(map, p) then
+				local depth = MapService.depth(map, p)
+				return p - Vector3.yAxis * (Config.POWERUP_DEPTH - depth)
+			end
+		end
+	end
+	return MapService.waterPoint(map, Config.POWERUP_DEPTH)
 end
 
 function PowerUpService.spawn(kind: string?, at: Vector3?)
 	if not round or not folder then
 		return
 	end
-	kind = kind or ORDER[math.random(1, #ORDER)]
-	local pos = at
-	if not pos then
-		local hooksOut = FishermanService.hookPositions()
-		if #hooksOut > 0 then
-			for _ = 1, 10 do
-				local h = hooksOut[math.random(1, #hooksOut)]
-				local a, d = math.random() * math.pi * 2, 6 + math.random() * 8
-				local p = h + Vector3.new(math.cos(a) * d, 0, math.sin(a) * d)
-				if inPond(p) then
-					pos = p
-					break
-				end
-			end
-		end
-		pos = pos or pondPoint()
-	end
+	kind = kind or randomKind()
+	local pos = at or baitPosition()
 	local bait = buildBait(kind)
-	bait:PivotTo(CFrame.new(pos.X, Config.WATER_LEVEL + 0.4, pos.Z))
+	bait:PivotTo(CFrame.new(pos))
+	local expires = now() + Config.POWERUP_LIFETIME
+	bait:SetAttribute("ExpiresAt", expires)
 	bait.Parent = folder
-	table.insert(items, { model = bait, kind = kind, expires = now() + Config.POWERUP_LIFETIME })
+	table.insert(items, { model = bait, kind = kind, expires = expires })
 end
 
 local function apply(info, kind: string)
@@ -135,6 +148,9 @@ local function apply(info, kind: string)
 		Remotes.Effect:FireAllClients("Aura", info.model, def.Color, 0.6)
 	elseif kind == "Invisible" then
 		FishService.setInvisible(info, Config.INVISIBLE_TIME)
+	elseif kind == "Titan" then
+		FishService.titan(info, Config.TITAN_TIME)
+		Remotes.Effect:FireAllClients("Titan", info.model, info.root.Position)
 	end
 	if info.player then
 		Remotes.Effect:FireClient(info.player, "PowerUp", info.model, kind, def.Label)
@@ -156,7 +172,7 @@ RunService.Heartbeat:Connect(function(dt)
 		if pos then
 			for _, info in FishService.fish do
 				if info.player and FishService.alive(info) and not info.model:GetAttribute("Caught") then
-					if (info.root.Position - pos).Magnitude < 3.6 + 1.6 * info.model:GetScale() then
+					if (info.root.Position - pos).Magnitude < 1.6 * BAIT_SCALE + 1.6 * info.model:GetScale() then
 						apply(info, item.kind)
 						taken = true
 						break

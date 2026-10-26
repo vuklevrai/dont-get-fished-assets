@@ -9,10 +9,11 @@ local FishGame = ReplicatedStorage:WaitForChild("FishGame")
 local Config = require(FishGame.Config)
 local FishSpecies = require(FishGame.FishSpecies)
 local FishService = require(script.Parent.FishService)
+local MapService = require(script.Parent.MapService)
 
 local RoundService = {}
 
-RoundService.settings = { Fishermen = true, Enemies = true, PowerUps = true, Difficulty = "Auto", HoldLobby = false }
+RoundService.settings = { Fishermen = true, Enemies = true, PowerUps = true, Difficulty = "Auto", HoldLobby = false, Map = "Auto" }
 RoundService.systems = {} -- services with start(round) / stop()
 RoundService.round = nil -- { map, startTime, testMode, elapsed() }
 
@@ -30,8 +31,10 @@ local function setPhase(name: string, duration: number?)
 	FishGame:SetAttribute("PhaseEnd", duration and now() + duration or 0)
 end
 
+-- the round's map: the admin's pick, or the next one in the rotation (MapService)
 function RoundService.currentMap(): Model
-	return workspace:WaitForChild("PondMap")
+	local pick = RoundService.settings.Map
+	return MapService.choose(pick ~= "Auto" and pick or nil)
 end
 
 function RoundService.publishSettings()
@@ -47,27 +50,9 @@ function RoundService.spawnAvatar(player: Player)
 	end
 end
 
--- a random underwater spot inside the pond, between its bed and the surface
-local rayParams = RaycastParams.new()
-rayParams.FilterType = Enum.RaycastFilterType.Include
-
+-- a random underwater spot of the map where a fish can appear
 function RoundService.waterSpot(map: Model, depthMargin: number?): CFrame
-	local level = map:GetAttribute("WaterLevel") or Config.WATER_LEVEL
-	local rx = map:GetAttribute("PondRadiusX") or 80
-	local rz = map:GetAttribute("PondRadiusZ") or 60
-	rayParams.FilterDescendantsInstances = { map:FindFirstChild("Ground") }
-	for _ = 1, 40 do
-		local a, r = math.random() * math.pi * 2, math.sqrt(math.random()) * 0.7
-		local x, z = math.cos(a) * r * rx, math.sin(a) * r * rz
-		local hit = workspace:Raycast(Vector3.new(x, 80, z), Vector3.new(0, -300, 0), rayParams)
-		local bed = hit and hit.Position.Y or level - 20
-		if bed < level - 9 then
-			local top = level - (depthMargin or 3)
-			local y = bed + 4 + math.random() * math.max(0, top - (bed + 4))
-			return CFrame.new(x, y, z) * CFrame.Angles(0, math.random() * math.pi * 2, 0)
-		end
-	end
-	return CFrame.new(0, level - 10, 0)
+	return MapService.spawnCFrame(map, depthMargin)
 end
 
 function RoundService.makeFish(player: Player)

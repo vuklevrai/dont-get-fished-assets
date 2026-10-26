@@ -10,6 +10,7 @@ local FishGame = ReplicatedStorage:WaitForChild("FishGame")
 local Config = require(FishGame.Config)
 local Remotes = FishGame.Remotes
 local FishService = require(script.Parent.FishService)
+local MapService = require(script.Parent.MapService)
 local RoundService = require(script.Parent.RoundService)
 
 local FishermanService = {}
@@ -264,12 +265,29 @@ function FishermanService.difficulty(): (number, number)
 	return steps[1][2], steps[1][3]
 end
 
+-- a CFrame at pos whose Y axis is `up` (on the ball map the water's surface is curved)
+local function alignUp(pos: Vector3, up: Vector3): CFrame
+	if up.Y > 0.999 then
+		return CFrame.new(pos)
+	end
+	local right = up:Cross(Vector3.zAxis)
+	if right.Magnitude < 1e-3 then
+		right = Vector3.xAxis
+	end
+	return CFrame.fromMatrix(pos, right.Unit, up)
+end
+
+-- v without its component along up
+local function flatten(v: Vector3, up: Vector3): Vector3
+	return v - up * v:Dot(up)
+end
+
 local function hookOnFish(hook)
 	-- the hook sits in the caught fish's mouth
 	local info = hook.caught
 	if info then
 		local nose = info.root.CFrame * CFrame.new(0, 0, -info.root.Size.Z / 2 - 0.4)
-		hook.model:PivotTo(CFrame.new(nose.Position + Vector3.new(0, HOOK_DEPTH - 1.2, 0)))
+		hook.model:PivotTo(alignUp(nose.Position + hook.up * (HOOK_DEPTH - 1.2), hook.up))
 	end
 end
 
@@ -281,8 +299,8 @@ local function release(hook, escaped: boolean)
 	end
 	info.model:SetAttribute("Caught", false)
 	if FishService.alive(info) then
-		local away = (hook.pos - hook.fisherman.model.PrimaryPart.Position) * Vector3.new(1, 0, 1)
-		local spot = Vector3.new(hook.pos.X, WATER - 4, hook.pos.Z)
+		local away = flatten(hook.pos - hook.fisherman.model.PrimaryPart.Position, hook.up)
+		local spot = hook.surface - hook.up * 4
 		info.root.Anchored = false
 		info.model:PivotTo(CFrame.lookAt(spot, spot + (away.Magnitude > 0.1 and away.Unit or Vector3.xAxis)))
 		info.root.AssemblyLinearVelocity = Vector3.zero
@@ -307,10 +325,10 @@ local function catch(hook, info)
 	pcall(info.root.SetNetworkOwner, info.root, nil)
 	info.root.Anchored = true
 	local fishermanRoot = hook.fisherman.model.PrimaryPart
-	local toFisherman = (fishermanRoot.Position - hook.pos) * Vector3.new(1, 0, 1)
+	local toFisherman = flatten(fishermanRoot.Position - hook.pos, hook.up)
 	toFisherman = toFisherman.Magnitude > 0.1 and toFisherman.Unit or Vector3.xAxis
-	local hang = Vector3.new(hook.pos.X, WATER + 7.5, hook.pos.Z) + toFisherman * 5
-	local hangCF = CFrame.lookAt(hang, hang + Vector3.yAxis, toFisherman)
+	local hang = hook.surface + hook.up * 7.4 + toFisherman * 5
+	local hangCF = CFrame.lookAt(hang, hang + hook.up, toFisherman)
 	local start = info.root.CFrame
 	setArm(hook.fisherman.model, 120, 0.3)
 	if info.player then
@@ -327,15 +345,22 @@ local function catch(hook, info)
 	end
 	setArm(hook.fisherman.model, 95, 0.4)
 	local nextDrain = os.clock() + Config.CATCH_DRAIN_INTERVAL
+	local seed = math.random() * 100
 	while hook.caught == info and FishService.alive(info) and running do
-		local wiggle = CFrame.Angles(math.rad(math.random(-14, 14)), math.rad(math.random(-25, 25)), math.rad(math.random(-10, 10)))
+		-- thrash on smooth noise: fast but continuous, never a jump to a random pose
+		local t = (os.clock() - t0) * 3.5
+		local wiggle = CFrame.Angles(
+			math.rad(26 * math.noise(t, seed, 0.31)),
+			math.rad(46 * math.noise(seed, t, 1.73)),
+			math.rad(18 * math.noise(2.9, seed, t))
+		)
 		info.model:PivotTo(hangCF * wiggle)
 		hookOnFish(hook)
 		if os.clock() >= nextDrain then
 			nextDrain += Config.CATCH_DRAIN_INTERVAL
 			FishService.damage(info, 1)
 		end
-		task.wait(0.06)
+		task.wait()
 	end
 	if hook.caught == info then
 		-- died on the line (or the round stopped)
@@ -361,39 +386,12 @@ Remotes.CatchResult.OnServerEvent:Connect(function(player, escaped)
 end)
 
 -- ------------------------------------------------------------------------------------------ casting
-local function randomTarget(fishermanPos: Vector3): Vector3
-	local map = round.map
-	local rx, rz = map:GetAttribute("PondRadiusX") or 100, map:GetAttribute("PondRadiusZ") or 80
-	for _ = 1, 30 do
-		local a, r = math.random() * math.pi * 2, math.sqrt(math.random()) * 0.85
-		local p = Vector3.new(math.cos(a) * rx * r, WATER, math.sin(a) * rz * r)
-		local d = ((p - fishermanPos) * Vector3.new(1, 0, 1)).Magnitude
-		if d > 18 and d < 100 then
-			return p
-		end
-	end
-	return Vector3.new(0, WATER, 0)
-end
-
+-- the realistic red fog is drawn by every client (Effects "Fog"); the hitbox stays a perfect sphere
 local function fog(position: Vector3)
-	local ball = part({ Name = "DangerZone", Shape = Enum.PartType.Ball, Size = Vector3.one * Config.HOOK_RADIUS * 2,
-		CFrame = CFrame.new(position), Color = Color3.fromRGB(255, 36, 36), Material = Enum.Material.ForceField, CastShadow = false })
-	local smoke = Instance.new("ParticleEmitter")
-	smoke.Texture = "rbxasset://textures/particles/smoke_main.dds"
-	smoke.Color = ColorSequence.new(Color3.fromRGB(255, 40, 40))
-	smoke.LightEmission = 0.4
-	smoke.Size = NumberSequence.new({ NumberSequenceKeypoint.new(0, 3), NumberSequenceKeypoint.new(1, 6) })
-	smoke.Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.55), NumberSequenceKeypoint.new(1, 1) })
-	smoke.Lifetime = NumberRange.new(1, 1.6)
-	smoke.Rate = 26
-	smoke.Speed = NumberRange.new(0.5, 2.5)
-	smoke.SpreadAngle = Vector2.new(180, 180)
-	smoke.Shape = Enum.ParticleEmitterShape.Sphere
-	smoke.ShapeStyle = Enum.ParticleEmitterShapeStyle.Volume
-	smoke.Parent = ball
-	TweenService:Create(ball, TweenInfo.new(0.5, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut, -1, true),
-		{ Size = Vector3.one * Config.HOOK_RADIUS * 2.15 }):Play()
-	return ball
+	Remotes.Effect:FireAllClients("Fog", nil, position, Config.HOOK_WARNING)
+	local marker = Instance.new("Folder")
+	marker.Name = "DangerZone"
+	return marker
 end
 
 local function waitWhile(seconds: number, hook): boolean
@@ -404,7 +402,7 @@ local function waitWhile(seconds: number, hook): boolean
 		end
 		if hook.state == "waiting" then
 			local bob = math.sin(os.clock() * 2.4 + hook.phase) * 0.18
-			hook.model:PivotTo(CFrame.new(hook.surface + Vector3.new(0, bob, 0)))
+			hook.model:PivotTo(alignUp(hook.surface + hook.up * bob, hook.up))
 		end
 		task.wait(0.1)
 	end
@@ -413,14 +411,14 @@ end
 
 local function castOnce(rec)
 	local root = rec.model.PrimaryPart
-	local target = randomTarget(root.Position)
+	local target, up = MapService.castTarget(round.map, root.Position)
 	local hookModel = buildHook()
 	local from = rec.tip.WorldPosition
 	hookModel:PivotTo(CFrame.new(from))
 	hookModel.Parent = folder
 	lineBeam(rec.tip, hookModel)
-	local hook = { fisherman = rec, model = hookModel, surface = target + Vector3.new(0, 0.15, 0),
-		pos = target - Vector3.new(0, HOOK_DEPTH, 0), state = "flying", phase = math.random() * 6, caught = nil }
+	local hook = { fisherman = rec, model = hookModel, surface = target + up * 0.15, up = up,
+		pos = target - up * HOOK_DEPTH, state = "flying", phase = math.random() * 6, caught = nil }
 	table.insert(hooks, hook)
 	-- swing and throw
 	setArm(rec.model, 140, 0.35)
@@ -433,7 +431,7 @@ local function castOnce(rec)
 		hookModel:PivotTo(CFrame.new(p))
 		task.wait()
 	end
-	hookModel:PivotTo(CFrame.new(hook.surface))
+	hookModel:PivotTo(alignUp(hook.surface, up))
 	Remotes.Effect:FireAllClients("Splash", nil, hook.surface, 0.6)
 	hook.state = "waiting"
 
