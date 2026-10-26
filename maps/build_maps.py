@@ -452,7 +452,7 @@ def do_aquarium(out_dir):
         underwater_fog((-M.HALF_X, M.FLOOR_Y, -M.HALF_Z), (M.HALF_X, M.WATER_LEVEL, M.HALF_Z), 0.0035)
         render(os.path.join(prev, "aquarium_underwater_rock_preview.png"), camera("uw", (-62, -66, -78), (0, -74, 4), 22))
         render(os.path.join(prev, "aquarium_underwater_castle_preview.png"),
-               camera("uw2", (-58, -62, 6), (M.CASTLE_CENTRE[0], -72, M.CASTLE_CENTRE[2]), 24))
+               camera("uw2", (-150, -56, -30), (M.CASTLE_CENTRE[0], -70, M.CASTLE_CENTRE[2]), 24))
     return spots
 
 
