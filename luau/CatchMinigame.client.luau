@@ -445,7 +445,7 @@ local function missed()
 	ringScaleVel -= 2
 	recoilVel -= polarVector(angle, 1) * 520
 	ClientState.shake(0.6, 0.3)
-	screenFlash(0.3, 0.6, function()
+	screenFlash(0.3, 0.6, function(_)
 		return RING_FLASH
 	end)
 	popText("-" .. tostring(FAIL_DAMAGE), polarVector(angle, RADIUS + 34), Vector2.new(90, 46), 0.8, RING_FLASH, false)
