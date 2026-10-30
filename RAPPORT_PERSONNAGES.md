@@ -28,7 +28,7 @@ Pour les capacités :
 Aperçus :
 - `characters/<nom>/previews/` : vues fixes, silhouette, un GIF par animation ;
 - `characters/previews/timestop.gif` et `croc.gif` : les deux capacités avec leurs effets ;
-- une visionneuse 3D en ligne : lien dans le message de livraison.
+- une visionneuse 3D en ligne, pour tourner autour des personnages et lancer chaque animation : https://claude.ai/artifact/8vR2QC1xAoeLriteUFyKcx
 
 ## Chiffres
 
