@@ -143,3 +143,20 @@ blender -b --factory-startup --python fx/weapon_fx.py -- <dossier>
 | `shockwave_ring.png` | 512² | Onde de choc blanche et cyan. Part plate en `FixedSize` 512, qui grandit de 0,3 r à 2 r en 0,35 s, avec `ImageTransparency` de 0,05 à 1 en 0,4 s. |
 | `missile_flame.png` | 256 × 64 | Flamme de tuyère pour un **`Beam`**. Le X de la texture suit le faisceau, la tuyère est à gauche, la queue est déjà fondue.<br>`TextureMode = Stretch`, `Attachment0` = tuyère, `Attachment1` 2,2 studs derrière.<br>`Width0` 0,75, `Width1` 0,25, `FaceCamera`, `LightEmission` 1, `LightInfluence` 0. `Width0` scintille de ±15 % à chaque image. |
 | `weapon_fx_preview_water.png`, `weapon_fx_preview_sky.png` | 1792 × 256 | Les 7 textures simples sur l'eau et sur le ciel. |
+
+## 9. Capacités des nouveaux personnages (`ability_fx.py`)
+
+Ces textures sont dessinées en 2D avec Pillow (dessin 4× plus grand, puis réduit pour lisser les bords), sans Blender : `python3 fx/ability_fx.py`. `AbilityFx.luau` les utilise via les clés `FxAssets` indiquées ci-dessous. Tant qu'une clé reste à `rbxassetid://0`, le module dessine une forme simple ou du texte à la place.
+
+| Fichier | Clé `FxAssets` | Usage |
+|---|---|---|
+| `timestop_clock.png` (512²) | `TimeStopClock` | Horloge au-dessus du poisson préhistorique pendant l'arrêt du temps |
+| `timestop_hand.png` (512²) | `TimeStopHand` | Son aiguille, dessinée depuis le centre vers le haut : un `ImageLabel` tourne autour de son centre |
+| `menacing_go.png` (256²) | `MenacingGo` | Le katakana « ゴ » de JoJo, violet, qui flotte autour du poisson |
+| `anger_vein.png` (256²) | `AngerVein` | Symbole de colère au-dessus du poisson enragé |
+| `bite_jaw.png` (512×192) | `BiteJaw` | Mâchoire du haut ; celle du bas est la même image tournée de 180° |
+| `impact_star.png` (256²) | `ImpactStar` | Étoile d'impact de la morsure, et des coups mis en attente pendant l'arrêt du temps |
+| `slow_ring.png` (512²) | `SlowRing` | Tourbillon posé à plat autour du crocodile : la zone de ralentissement |
+| `slow_icon.png` (256²) | `SlowIcon` | Escargot au-dessus des poissons ralentis |
+
+Aperçu des 8 textures sur les deux fonds habituels : `ability_fx_preview.png`.

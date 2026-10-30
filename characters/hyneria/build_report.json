@@ -1,0 +1,25 @@
+{
+ "key": "hyneria",
+ "model": "Hyneria",
+ "loop_errors": [],
+ "game_parts": 234,
+ "game_pieces": 75,
+ "game_joints": 19,
+ "roblox_fk_error_studs": 0.001177,
+ "blender_tris": 7030,
+ "blender_meshes": 75,
+ "blender_eval_error": 0.0,
+ "glb_error": 0.0,
+ "glb": {
+  "nodes": 97,
+  "meshes": 75,
+  "materials": 16,
+  "tris": 7030,
+  "anims": [
+   "repos",
+   "nage",
+   "arret_du_temps",
+   "rage"
+  ]
+ }
+}

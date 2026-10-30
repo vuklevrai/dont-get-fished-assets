@@ -3,3 +3,5 @@ __pycache__/
 _fog_frames/
 _frames/
 _aim_frames/
+characters/*/previews/frames/
+characters/previews/frames_*/

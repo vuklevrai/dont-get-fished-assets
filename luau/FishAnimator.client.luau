@@ -1,5 +1,12 @@
 -- Plays the fish animations exported from Blender (FishAnims): "nage" while swimming (faster with speed),
--- "repos" when idle, "attaque" when the fish dashes, and a frantic swim while caught on a hook.
+-- "repos" when idle, and a frantic swim while caught on a hook. Each FishAnims module can also list:
+--   triggers  { [attribute] = clip }  one-shot clip when that timestamp attribute changes
+--             (default { DashStart = "attaque" }, the bonite's dash);
+--   states    { [attribute] = clip }  loop that replaces the swim while the attribute (a server time) is ahead,
+--             e.g. RageUntil = "rage" for the prehistoric fish after its time stop;
+--   overlays  { [attribute] = clip }  loop on its own joints only, on top of everything, while the attribute is
+--             ahead, e.g. BiteArmedUntil = "gueule_ouverte" (the crocodile's open jaws).
+-- A fish whose TimeFrozenUntil is ahead keeps its pose (time stop). Every switch cross-fades over FADE seconds.
 -- The local player's fish follows FishController's swim intensity and stroke phase (ClientState), so the tail
 -- beats with the speed surges; every other fish is driven by its speed.
 local CollectionService = game:GetService("CollectionService")
@@ -12,7 +19,10 @@ local ClientState = require(FishGame:WaitForChild("ClientState"))
 local FishSpecies = require(FishGame:WaitForChild("FishSpecies"))
 local animFolder = FishGame:WaitForChild("FishAnims")
 
-local ATTACK_SPEED = 1.6 -- the 1.8 s attack plays in about a second
+local ATTACK_SPEED = 1.6 -- clips without their own speed (the bonite's 1.8 s attack plays in about a second)
+local FADE = 0.12
+local DEFAULT_TRIGGERS = { DashStart = "attaque" }
+local NONE = {}
 local clips = {}
 
 local function clipsFor(model: Model)
@@ -45,6 +55,14 @@ local function sample(anim, joint: string, t: number, loop: boolean): CFrame?
 	return ca:Lerp(cb, f - i)
 end
 
+local function scaled(cf: CFrame, scale: number): CFrame
+	return cf.Rotation + cf.Position * scale
+end
+
+local function smooth(x: number): number
+	return x * x * (3 - 2 * x)
+end
+
 local fishes = {}
 
 local function track(model: Instance)
@@ -62,7 +80,8 @@ local function track(model: Instance)
 	end
 	local conn = model.DescendantAdded:Connect(add)
 	fishes[model] = { motors = motors, swim = math.random() * 3, idle = math.random() * 3, conn = conn,
-		lastDash = model:GetAttribute("DashStart") or 0, attackT = nil }
+		trig = {}, shot = nil, shotT = 0, loopName = nil, loopT = 0, overlayW = {}, overlayT = 0,
+		fadeFrom = nil, fadeT = 1 }
 end
 
 CollectionService:GetInstanceAddedSignal(Config.ANIMATED_TAG):Connect(track)
@@ -78,6 +97,7 @@ for _, model in CollectionService:GetTagged(Config.ANIMATED_TAG) do
 end
 
 RunService.PreSimulation:Connect(function(dt)
+	local now = workspace:GetServerTimeNow()
 	for model, state in fishes do
 		local root = model.PrimaryPart
 		if not root or not model.Parent then
@@ -87,6 +107,68 @@ RunService.PreSimulation:Connect(function(dt)
 		if not anims then
 			continue
 		end
+		-- time stop: the pose holds until time resumes
+		if (model:GetAttribute("TimeFrozenUntil") or 0) > now then
+			continue
+		end
+		local set = anims.anims
+		local switched = false
+
+		-- one-shot clips on timestamp attributes
+		for attr, clipName in anims.triggers or DEFAULT_TRIGGERS do
+			local v = model:GetAttribute(attr) or 0
+			local last = state.trig[attr]
+			if last == nil then
+				state.trig[attr] = v
+			elseif v ~= last then
+				state.trig[attr] = v
+				if v > 0 and set[clipName] then
+					state.shot, state.shotT = clipName, 0
+					switched = true
+				end
+			end
+		end
+		local shot = nil
+		if state.shot then
+			local clip = set[state.shot]
+			state.shotT += dt * (clip.speed or ATTACK_SPEED)
+			if state.shotT >= clip.length then
+				state.shot = nil
+				switched = true
+			else
+				shot = clip
+			end
+		end
+
+		-- species loop replacing the swim (rage)
+		local loopName = nil
+		for attr, clipName in anims.states or NONE do
+			if (model:GetAttribute(attr) or 0) > now and set[clipName] then
+				loopName = clipName
+			end
+		end
+		if loopName ~= state.loopName then
+			state.loopName, state.loopT = loopName, 0
+			switched = true
+		end
+		local loopClip = loopName and set[loopName]
+		if loopClip then
+			state.loopT += dt * (loopClip.speed or 1)
+		end
+
+		-- overlays fade in and out on their own
+		local overlays = {}
+		for attr, clipName in anims.overlays or NONE do
+			local on = (model:GetAttribute(attr) or 0) > now and set[clipName] ~= nil
+			local w = math.clamp((state.overlayW[clipName] or 0) + (on and dt or -dt) / FADE, 0, 1)
+			state.overlayW[clipName] = w
+			if w > 0 then
+				overlays[clipName] = smooth(w)
+			end
+		end
+		state.overlayT += dt
+
+		-- the swim / idle mix (as before)
 		local speed = root.AssemblyLinearVelocity.Magnitude
 		local k = math.clamp(speed / (Config.SWIM_SPEED * 1.4), 0, 1)
 		local mine = ClientState.swimModel == model
@@ -98,43 +180,52 @@ RunService.PreSimulation:Connect(function(dt)
 		end
 		local caught = model:GetAttribute("Caught")
 		if mine and not caught then
-			state.swim = ClientState.swimPhase * anims.anims.nage.length
+			state.swim = ClientState.swimPhase * set.nage.length
 		else
 			state.swim += dt * (caught and 3.5 or (0.7 + 1.6 * k))
 		end
 		state.idle += dt
-		local dashStart = model:GetAttribute("DashStart") or 0
-		if dashStart ~= state.lastDash then
-			state.lastDash = dashStart
-			state.attackT = 0
-		end
-		local attack = nil
-		if state.attackT then
-			state.attackT += dt * ATTACK_SPEED
-			if state.attackT >= anims.anims.attaque.length then
-				state.attackT = nil
-			else
-				attack = state.attackT
-			end
-		end
-		local scale = model:GetScale()
 		local swimWeight = caught and 1 or math.clamp(k * 2.5, 0, 1)
+
+		if switched then
+			-- cross-fade from what is on screen now
+			local from = {}
+			for name, motor in state.motors do
+				from[name] = motor.Transform
+			end
+			state.fadeFrom, state.fadeT = from, 0
+		end
+		state.fadeT = math.min(1, state.fadeT + dt / FADE)
+
+		local scale = model:GetScale()
 		for name, motor in state.motors do
-			local pose
-			if attack then
-				pose = sample(anims.anims.attaque, name, attack, false)
-			else
-				local swim = sample(anims.anims.nage, name, state.swim, true)
-				local idle = sample(anims.anims.repos, name, state.idle, true)
+			local pose = shot and sample(shot, name, state.shotT, false)
+			if not pose and loopClip and not caught then
+				pose = sample(loopClip, name, state.loopT, true)
+			end
+			if not pose then
+				local swim = sample(set.nage, name, state.swim, true)
+				local idle = sample(set.repos, name, state.idle, true)
 				if swim and idle then
 					pose = idle:Lerp(swim, swimWeight)
 				else
 					pose = swim or idle
 				end
 			end
-			if pose then
-				motor.Transform = pose.Rotation + pose.Position * scale
+			if not pose then
+				continue
 			end
+			pose = scaled(pose, scale)
+			for clipName, w in overlays do
+				local o = sample(set[clipName], name, state.overlayT, true)
+				if o then
+					pose = pose:Lerp(scaled(o, scale), w)
+				end
+			end
+			if state.fadeT < 1 and state.fadeFrom and state.fadeFrom[name] then
+				pose = state.fadeFrom[name]:Lerp(pose, smooth(state.fadeT))
+			end
+			motor.Transform = pose
 		end
 	end
 end)

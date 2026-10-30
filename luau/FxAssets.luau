@@ -22,4 +22,14 @@ return {
 	MissileFlame = "rbxassetid://0", -- missile_flame.png: Beam texture, nozzle on the left
 	Bubble = "rbxassetid://0", -- bubble.png
 	ShardSpark = "rbxassetid://0", -- shard_spark.png: sparkle when a block leaves a fish
+
+	-- characters (fx/ability_fx.py): AbilityFx draws plain shapes or text while these are at 0
+	TimeStopClock = "rbxassetid://0", -- timestop_clock.png
+	TimeStopHand = "rbxassetid://0", -- timestop_hand.png: drawn from the centre up
+	MenacingGo = "rbxassetid://0", -- menacing_go.png
+	AngerVein = "rbxassetid://0", -- anger_vein.png
+	BiteJaw = "rbxassetid://0", -- bite_jaw.png: upper jaw, the lower one is turned 180
+	ImpactStar = "rbxassetid://0", -- impact_star.png
+	SlowRing = "rbxassetid://0", -- slow_ring.png: laid flat around the crocodile
+	SlowIcon = "rbxassetid://0", -- slow_icon.png
 }

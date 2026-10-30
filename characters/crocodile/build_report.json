@@ -1,0 +1,25 @@
+{
+ "key": "crocodile",
+ "model": "Crocodile",
+ "loop_errors": [],
+ "game_parts": 221,
+ "game_pieces": 75,
+ "game_joints": 16,
+ "roblox_fk_error_studs": 0.000885,
+ "blender_tris": 6824,
+ "blender_meshes": 75,
+ "blender_eval_error": 0.0,
+ "glb_error": 0.0,
+ "glb": {
+  "nodes": 94,
+  "meshes": 75,
+  "materials": 15,
+  "tris": 6824,
+  "anims": [
+   "repos",
+   "nage",
+   "gueule_ouverte",
+   "croc"
+  ]
+ }
+}

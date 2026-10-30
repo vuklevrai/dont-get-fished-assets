@@ -1,0 +1,24 @@
+{
+ "key": "piranha",
+ "model": "Piranha",
+ "loop_errors": [],
+ "game_parts": 187,
+ "game_pieces": 53,
+ "game_joints": 15,
+ "roblox_fk_error_studs": 0.00045,
+ "blender_tris": 6130,
+ "blender_meshes": 53,
+ "blender_eval_error": 0.0,
+ "glb_error": 0.0,
+ "glb": {
+  "nodes": 71,
+  "meshes": 53,
+  "materials": 12,
+  "tris": 6130,
+  "anims": [
+   "repos",
+   "nage",
+   "dash"
+  ]
+ }
+}

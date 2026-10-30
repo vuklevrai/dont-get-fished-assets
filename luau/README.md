@@ -1,5 +1,16 @@
 # Modules Luau
 
+## Personnages (branche `characters`)
+
+Le poisson ennemi (piranha rouge, pour les bots), le poisson préhistorique (arrêt du temps) et le crocodile (croc) sont prêts à intégrer.
+
+Le guide pas à pas est dans **`CHARACTERS_INTEGRATION.md`**. Il couvre les fichiers à copier, les petits correctifs (chercher, puis remplacer par) et un test après chaque étape.
+
+Fichiers :
+- générés par `characters/build_characters.py` : `FishData/*.luau` et `FishAnims/*.luau` ;
+- nouveaux modules : `AbilityService.luau` (serveur) et `AbilityFx.luau` (client) ;
+- versions mises à jour : `FishBuilder.luau`, `FishAnimator.client.luau`, `FishSpecies.luau` et `FxAssets.luau`.
+
 ## Brief 2
 
 Tous ces modules sont des **ModuleScripts client**, à placer dans `ReplicatedStorage.FishGame`. Seul `VoteUi` est un LocalScript.
